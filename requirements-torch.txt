@@ -1,0 +1,17 @@
+# Install from the official PyTorch index. CUDA wheels are Windows/Linux-specific
+# and are NOT bundled by pip from PyPI in a portable way.
+#
+# CPU (this Linux VM, or a Windows machine without an NVIDIA GPU):
+#   pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+#
+# CUDA 12.1 (typical Windows 10/11 NVIDIA install):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+# CUDA 12.4:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+#
+# xformers is optional and CUDA-version-specific; do not bundle it. When present,
+# the vendored attention path uses memory-efficient attention automatically.
+
+torch>=2.2
+torchvision>=0.17

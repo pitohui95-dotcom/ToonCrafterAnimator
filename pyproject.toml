@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tooncrafter-animator"
+version = "1.0.0"
+description = "Standalone desktop app for real ToonCrafter keyframe interpolation"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "SU SU" }]
+dependencies = [
+    "PySide6>=6.6",
+    "Pillow>=10.0",
+    "numpy>=1.26",
+    "omegaconf>=2.3",
+    "einops>=0.7",
+    "safetensors>=0.4",
+    "PyYAML>=6.0",
+    "tqdm>=4.65",
+    "pytorch-lightning>=2.0",
+    "open_clip_torch>=2.22.0",
+    "transformers>=4.36",
+    "kornia>=0.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+# torch / torchvision are installed from the PyTorch index; see requirements-torch.txt
+
+[project.scripts]
+tooncrafter-animator = "tooncrafter_animator.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tooncrafter_animator = [
+    "assets/*",
+    "vendor/tooncrafter/**/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: real-weights end-to-end (needs TOONCRAFTER_CKPT and TOONCRAFTER_CLIP)",
+    "gpu: requires CUDA",
+    "packaged: requires a built release binary",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]

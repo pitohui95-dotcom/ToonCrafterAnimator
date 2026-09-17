@@ -1,0 +1,4 @@
+A native Windows .exe cannot be cross-compiled from Linux.
+Run build_exe.bat or build_exe.ps1 on Windows 10/11 x64 (Python 3.10).
+Until then, run the app from source:
+  python -m tooncrafter_animator

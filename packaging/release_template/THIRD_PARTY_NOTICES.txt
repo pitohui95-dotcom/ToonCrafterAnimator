@@ -1,0 +1,34 @@
+Third-party notices — ToonCrafter Animator
+==========================================
+
+This application is Apache-2.0. See licenses\APP_LICENSE.txt.
+
+Vendored inference code
+-----------------------
+ToonCrafter (https://github.com/ToonCrafter/ToonCrafter) — Apache-2.0, Copyright Tencent.
+  licenses\ToonCrafter_LICENSE.txt
+ComfyUI-ToonCrafter (https://github.com/AIGODLIKE/ComfyUI-ToonCrafter) — Apache-2.0.
+  licenses\ComfyUI-ToonCrafter_LICENSE.txt
+Modifications to the vendored subset are listed in licenses\PROVENANCE.md.
+
+PyTorch / torchvision — BSD-style license.
+PySide6 / Qt — GNU LGPLv3. Dynamically linked, unmodified. You may relink by
+  replacing the PySide6 / Qt DLLs in _internal with another LGPL-compliant build.
+  Qt source: https://code.qt.io/cgit/qt/qtbase.git
+  LGPLv3 text: licenses\LGPLv3.txt
+Pillow — MIT-CMU.
+NumPy — BSD-3-Clause.
+einops — MIT.
+OmegaConf — BSD-3-Clause.
+safetensors — Apache-2.0.
+open_clip_torch — MIT. The ViT-H-14 weights are a separate asset, not shipped.
+transformers — Apache-2.0.
+kornia — Apache-2.0.
+pytorch-lightning — Apache-2.0.
+ffmpeg — LGPL-2.1+ build only (licenses\LGPLv2.1.txt). GPL ffmpeg must not be
+  redistributed with this folder.
+
+Model weights (not redistributed)
+---------------------------------
+Doubiiu/ToonCrafter, Kijai/DynamiCrafter_pruned, OpenCLIP laion2b_s32b_b79k.
+The Apache-2.0 grant on the code does not cover the weights.

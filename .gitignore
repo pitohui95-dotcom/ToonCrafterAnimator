@@ -1,0 +1,40 @@
+.venv/
+.venv-*/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+
+# Model weights — never commit
+*.ckpt
+*.safetensors
+*.pt
+*.pth
+*.bin
+
+# PyInstaller / release binaries
+/release/ToonCrafterAnimator/_internal/
+/release/ToonCrafterAnimator/ToonCrafterAnimator
+/release/ToonCrafterAnimator/ToonCrafterAnimator.exe
+/release/ToonCrafterAnimator/ffmpeg/*.exe
+/release/ToonCrafterAnimator/ffmpeg/ffmpeg
+/packaging/ffmpeg_cache/
+/packaging/dist/
+/packaging/build/
+
+# Local app data copies
+.local-appdata/
+
+# OS
+.DS_Store
+Thumbs.db
