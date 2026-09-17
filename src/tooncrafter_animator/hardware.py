@@ -29,7 +29,8 @@ def torch_available() -> bool:
         import torch  # noqa: F401
 
         return True
-    except ImportError:
+    except Exception:
+        # ImportError, or a broken partial install (missing CUDA .so, etc.)
         return False
 
 
@@ -49,7 +50,7 @@ def list_devices() -> list[DeviceInfo]:
     ]
     try:
         import torch
-    except ImportError:
+    except Exception:
         devices[0] = DeviceInfo(
             id="cpu",
             name="CPU (PyTorch not installed)",

@@ -93,24 +93,12 @@ class StubModel(torch.nn.Module):
 
 
 def test_batch_ddim_shapes_and_ref_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter_mod.ensure_vendor_on_path()
+    import lvdm.models.samplers.ddim as ddim_mod
+
     model = StubModel()
     sampler = StubSampler(model)
-
-    def fake_sampler(m):
-        return sampler
-
-    monkeypatch.setattr(adapter_mod, "ensure_vendor_on_path", lambda: None)
-    monkeypatch.setattr("lvdm.models.samplers.ddim.DDIMSampler", fake_sampler, raising=False)
-
-    # Import DDIMSampler patch via injecting into adapter's batch function by stubbing the import.
-    import types, sys
-
-    fake_ddim = types.ModuleType("lvdm.models.samplers.ddim")
-    fake_ddim.DDIMSampler = fake_sampler
-    sys.modules["lvdm"] = types.ModuleType("lvdm")
-    sys.modules["lvdm.models"] = types.ModuleType("lvdm.models")
-    sys.modules["lvdm.models.samplers"] = types.ModuleType("lvdm.models.samplers")
-    sys.modules["lvdm.models.samplers.ddim"] = fake_ddim
+    monkeypatch.setattr(ddim_mod, "DDIMSampler", lambda m: sampler)
 
     b, c, t, h, w = 1, 4, 16, 40, 64
     cond = {
@@ -126,7 +114,7 @@ def test_batch_ddim_shapes_and_ref_context(monkeypatch: pytest.MonkeyPatch) -> N
     assert out.shape[1] == 1  # n_samples
     assert sampler.calls, "DDIMSampler.sample was not called"
     call = sampler.calls[0]
-    assert call["shape"] == (c, t, h, w)
+    assert tuple(call["shape"]) == (c, t, h, w)
     assert "fs" in call
     assert call["unconditional_guidance_scale"] == 7.5
     assert call["timestep_spacing"] == "uniform_trailing"

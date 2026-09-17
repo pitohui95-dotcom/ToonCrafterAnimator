@@ -131,6 +131,11 @@ QPushButton#danger {{
     color: #1A0000;
     font-weight: 700;
 }}
+QPushButton#danger:disabled {{
+    background: {DISABLED_BG};
+    color: {DISABLED_TEXT};
+    border-color: {BORDER};
+}}
 QProgressBar {{
     background: {SURFACE_2};
     border: 1px solid {BORDER};

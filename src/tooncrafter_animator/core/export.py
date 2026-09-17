@@ -74,7 +74,7 @@ def export_mp4(frames: list[np.ndarray], dest: Path, fps: int, ffmpeg_path: Path
     parent = dest.parent
     parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=".mp4-part-", dir=str(parent)))
-    staging = dest.with_suffix(dest.suffix + f".part-{os.getpid()}")
+    staging = dest.with_name(f"{dest.stem}.part-{os.getpid()}.mp4")
     try:
         for index, frame in enumerate(even):
             array_to_image(frame).save(work / f"frame_{index:04d}.png")
@@ -93,6 +93,8 @@ def export_mp4(frames: list[np.ndarray], dest: Path, fps: int, ffmpeg_path: Path
             "17",
             "-movflags",
             "+faststart",
+            "-f",
+            "mp4",
             str(staging),
         ]
         proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -117,7 +119,7 @@ def export_gif(
     duration_ms = max(1, int(round(1000 / max(fps, 1))))
     parent = dest.parent
     parent.mkdir(parents=True, exist_ok=True)
-    staging = dest.with_suffix(dest.suffix + f".part-{os.getpid()}")
+    staging = dest.with_name(f"{dest.stem}.part-{os.getpid()}.gif")
     if ffmpeg is not None:
         work = Path(tempfile.mkdtemp(prefix=".gif-part-", dir=str(parent)))
         try:

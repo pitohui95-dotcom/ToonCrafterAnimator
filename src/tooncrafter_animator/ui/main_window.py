@@ -88,14 +88,18 @@ class MainWindow(QMainWindow):
         mid_scroll = QScrollArea()
         mid_scroll.setWidgetResizable(True)
         mid_scroll.setWidget(self.gen)
+        mid_scroll.setMinimumWidth(380)
+        left_w.setMinimumWidth(300)
+        self.preview.setMinimumWidth(360)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(left_w)
         splitter.addWidget(mid_scroll)
         splitter.addWidget(self.preview)
         splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(1, 3)
         splitter.setStretchFactor(2, 3)
+        splitter.setSizes([360, 480, 600])
 
         root = QVBoxLayout()
         root.addWidget(splitter, 1)
@@ -103,7 +107,7 @@ class MainWindow(QMainWindow):
         central = QWidget()
         central.setLayout(root)
         self.setCentralWidget(central)
-        self.resize(1440, 900)
+        self.resize(1600, 920)
 
         self.keyframes.changed.connect(self._refresh_actions)
         self.gen.changed.connect(self._refresh_actions)
