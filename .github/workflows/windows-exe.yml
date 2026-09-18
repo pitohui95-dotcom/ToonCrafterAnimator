@@ -32,13 +32,14 @@ jobs:
       - name: Install CUDA PyTorch (cu121)
         run: |
           python -m pip install --upgrade pip wheel
-          python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+          python -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
           python -c "import torch, torchvision; assert torch.version.cuda, 'CPU torch installed; refusing GPU pack'; print('torch', torch.__version__, 'cuda', torch.version.cuda, 'vision', torchvision.__version__); print('cuda_available_on_runner', torch.cuda.is_available())"
 
       - name: Install app dependencies and PyInstaller
         run: |
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
+          python -c "import torch, torchvision; assert torch.version.cuda, 'requirements.txt replaced CUDA torch with CPU'; print('post_reqs', torch.__version__, torch.version.cuda, torchvision.__version__)"
 
       - name: Generate icon, fetch LGPL ffmpeg, PyInstaller, assemble release
         env:
@@ -59,9 +60,11 @@ jobs:
           $tv = Get-ChildItem -Path $root -Recurse -Filter "torchvision" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $tv) { throw "torchvision package missing from onedir (nms ops)" }
           $native = Get-ChildItem -Path $tv.FullName -File | Where-Object {
-            $_.Name -like "_C*" -or $_.Name -like "image_stable*" -or $_.Extension -in @(".pyd",".dll",".so")
+            $_.Extension -in @(".pyd",".dll",".so") -and (
+              $_.Name -like "_C*" -or $_.Name -like "image*" -or $_.Name -like "image_stable*"
+            )
           }
-          if (-not $native) { throw "torchvision C++ extension (_C_stable/_C) missing; torchvision::nms will fail" }
+          if (-not $native) { throw "torchvision C++ extension (_C.pyd / _C_stable.pyd) missing; torchvision::nms will fail" }
           Write-Host "torchvision native:"
           $native | Format-Table Name, Length
           $tc = Get-ChildItem -Path $root -Recurse -Filter "__init__.py" -File -ErrorAction SilentlyContinue |
@@ -73,11 +76,13 @@ jobs:
           if (-not $yaml) { throw "ToonCrafter inference_512_v1.0.yaml missing from onedir" }
           $cudaHits = Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue |
             Where-Object {
+              $_.Extension -in @(".dll",".pyd",".so") -and
               $_.Name -match 'cublas|cudnn|cudart|nvrtc|c10_cuda|torch_cuda|cusolver|cufft'
             }
-          if (-not $cudaHits -or $cudaHits.Count -lt 2) {
-            throw "CUDA torch binaries missing (cublas/cudnn/c10_cuda/torch_cuda); refusing CPU-only pack as GPU"
-          }
+          $names = @($cudaHits | ForEach-Object { $_.Name.ToLowerInvariant() })
+          if (-not ($names | Where-Object { $_ -like "*c10_cuda*" })) { throw "c10_cuda.dll missing; refusing CPU-only pack as GPU" }
+          if (-not ($names | Where-Object { $_ -like "torch_cuda*" })) { throw "torch_cuda.dll missing; refusing CPU-only pack as GPU" }
+          if (-not ($names | Where-Object { $_ -match "cublas|cudnn|cudart" })) { throw "cublas/cudnn/cudart DLL missing; refusing CPU-only pack as GPU" }
           Write-Host "CUDA natives (sample):"
           $cudaHits | Select-Object -First 25 | Format-Table Name, Length, FullName
           Get-Item $exe | Format-List FullName, Length, LastWriteTime
@@ -106,7 +111,7 @@ jobs:
 
             This is the GPU-capable release. On an NVIDIA PC the app lists CUDA devices and defaults to FP16. GitHub Actions itself has no GPU — the wheels are still the CUDA build, not CPU torch.
 
-            Contents: `ToonCrafterAnimator.exe`, `ffmpeg/` (LGPL), `assets/`, `licenses/`, `README.txt` (Simplified Chinese), `THIRD_PARTY_NOTICES.txt`, `checksums.sha256`, vendored ToonCrafter, torchvision `_C_stable`.
+            Contents: `ToonCrafterAnimator.exe`, `ffmpeg/` (LGPL), `assets/`, `licenses/`, `README.txt` (Simplified Chinese; this build includes CUDA PyTorch), `THIRD_PARTY_NOTICES.txt`, `checksums.sha256`, vendored ToonCrafter, torchvision `_C.pyd` / `_C_stable.pyd` (nms), and CUDA torch DLLs (`torch_cuda`, `c10_cuda`, cublas/cudnn).
 
             If you downloaded `.part01` / `.part02` files, merge them first (`copy /b …`) then unzip. See `README.txt` / `*.JOIN.txt`.
 

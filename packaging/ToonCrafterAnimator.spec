@@ -139,6 +139,39 @@ datas += [(str(VENDOR), "vendor")]
 datas += [(str(TOONCRAFTER_PKG), "ToonCrafter")]
 datas += [(str(LVDM_PKG), "lvdm")]
 
+_RUNTIME_NATIVE = {".dll", ".pyd", ".so", ".dylib"}
+_SKIP_TORCH_DATA_SUFFIX = {
+    ".h",
+    ".hpp",
+    ".cuh",
+    ".cuhpp",
+    ".cmake",
+    ".lib",
+    ".a",
+    ".cpp",
+    ".cc",
+    ".c",
+}
+
+
+def _keep_data_item(src: object, dest: object = "") -> bool:
+    """Drop compiler headers / import libs that collect_all(torch) otherwise ships."""
+    src_path = Path(str(src))
+    posix = str(src).replace("\\", "/").lower()
+    dest_posix = str(dest).replace("\\", "/").lower()
+    if "/include/" in posix or "/include/" in dest_posix:
+        return False
+    if "/share/cmake" in posix or "/share/cmake" in dest_posix:
+        return False
+    if src_path.suffix.lower() in _SKIP_TORCH_DATA_SUFFIX:
+        return False
+    return True
+
+
+def _keep_binary_item(src: object, dest: object = "") -> bool:
+    return Path(str(src)).suffix.lower() in _RUNTIME_NATIVE
+
+
 binaries = []
 try:
     binaries += collect_dynamic_libs("torch")
@@ -152,10 +185,11 @@ except Exception:
 # CUDA wheels put cublas/cudnn/nvrtc/c10_cuda next to torch (and sometimes
 # under site-packages/nvidia/). Collect them so the frozen EXE can actually
 # call torch.cuda on an NVIDIA GPU — CPU-only torch must not be labeled GPU.
+# Do not ship torch/include or *.lib (hundreds of MB, not loaded at runtime).
 try:
     torch_datas, torch_binaries, torch_hidden = collect_all("torch")
-    datas += torch_datas
-    binaries += torch_binaries
+    datas += [item for item in torch_datas if _keep_data_item(*item[:2])]
+    binaries += [item for item in torch_binaries if _keep_binary_item(*item[:2])]
     hidden += torch_hidden
 except Exception:
     pass
@@ -164,9 +198,8 @@ except Exception:
 def _add_native_tree(directory: Path, dest_root: str) -> None:
     if not directory.is_dir():
         return
-    native_ext = {".dll", ".pyd", ".so", ".dylib"}
     for path in directory.rglob("*"):
-        if path.is_file() and path.suffix.lower() in native_ext:
+        if path.is_file() and path.suffix.lower() in _RUNTIME_NATIVE:
             rel = path.parent.relative_to(directory)
             dest = dest_root if str(rel) == "." else f"{dest_root}/{rel.as_posix()}"
             binaries.append((str(path), dest))
@@ -207,8 +240,8 @@ except Exception:
 # PyInstaller cannot drop torchvision::nms.
 try:
     tv_datas, tv_binaries, tv_hidden = collect_all("torchvision")
-    datas += tv_datas
-    binaries += tv_binaries
+    datas += [item for item in tv_datas if _keep_data_item(*item[:2])]
+    binaries += [item for item in tv_binaries if _keep_binary_item(*item[:2])]
     hidden += tv_hidden
 except Exception:
     pass
@@ -217,12 +250,15 @@ try:
     import torchvision as _tv
 
     _tv_dir = Path(_tv.__file__).resolve().parent
-    for _pat in ("_C*", "image_stable*", "*.pyd", "*.dll", "*.so"):
+    for _pat in ("_C*", "image_stable*", "image.pyd", "*.pyd", "*.dll", "*.so"):
         for _path in _tv_dir.glob(_pat):
-            if _path.is_file():
+            if _path.is_file() and _path.suffix.lower() in _RUNTIME_NATIVE:
                 binaries.append((str(_path), "torchvision"))
 except Exception:
     pass
+
+binaries = [item for item in binaries if _keep_binary_item(*item[:2])]
+datas = [item for item in datas if _keep_data_item(*item[:2])]
 
 excludes = [
     "gradio",

@@ -22,6 +22,10 @@ CUDA_NAME_HINTS = (
     "nvjitlink",
     "cupti",
 )
+NATIVE_SUFFIXES = {".dll", ".pyd", ".so", ".dylib"}
+# Headers / .pyi named *cudnn* must not count as a GPU pack.
+REQUIRED_CUDA_STEMS = ("c10_cuda", "torch_cuda")
+REQUIRED_CUDA_ANY = ("cublas", "cudnn", "cudart")
 
 
 def verify_tooncrafter_bundle(dist: Path) -> None:
@@ -80,34 +84,57 @@ def verify_torchvision_bundle(dist: Path) -> None:
 def _native_files(root: Path) -> list[Path]:
     out = []
     for path in root.rglob("*"):
-        if path.is_file() and path.suffix.lower() in {".dll", ".pyd", ".so", ".dylib"}:
+        if path.is_file() and path.suffix.lower() in NATIVE_SUFFIXES:
             out.append(path)
     return out
 
 
-def verify_cuda_bundle(dist: Path) -> None:
-    """Fail if this was supposed to be a CUDA onedir but only CPU torch landed."""
-    try:
-        import torch
+def cuda_native_hits(files: list[Path]) -> list[Path]:
+    """Only .dll/.pyd/.so whose *filename* looks like a CUDA runtime lib."""
+    hits = []
+    for path in files:
+        if path.suffix.lower() not in NATIVE_SUFFIXES:
+            continue
+        name = path.name.lower()
+        if any(hint in name for hint in CUDA_NAME_HINTS):
+            hits.append(path)
+    return hits
 
-        cuda_ver = getattr(torch.version, "cuda", None)
-    except Exception as exc:
-        raise SystemExit(f"cannot import torch while verifying CUDA bundle: {exc}") from exc
-    if not cuda_ver:
-        raise SystemExit(
-            "TORCH_VARIANT=cuda but torch.version.cuda is empty — refusing to label a CPU wheel as GPU"
-        )
+
+def cuda_runtime_complete(hits: list[Path]) -> bool:
+    names = [p.name.lower() for p in hits]
+    has_required = all(
+        any(stem in name for name in names) for stem in REQUIRED_CUDA_STEMS
+    )
+    has_blas_or_dnn = any(
+        any(token in name for name in names) for token in REQUIRED_CUDA_ANY
+    )
+    return has_required and has_blas_or_dnn
+
+
+def verify_cuda_bundle(dist: Path, *, require_installed_cuda_torch: bool = True) -> None:
+    """Fail if this was supposed to be a CUDA onedir but only CPU torch landed."""
+    if require_installed_cuda_torch:
+        try:
+            import torch
+
+            cuda_ver = getattr(torch.version, "cuda", None)
+        except Exception as exc:
+            raise SystemExit(f"cannot import torch while verifying CUDA bundle: {exc}") from exc
+        if not cuda_ver:
+            raise SystemExit(
+                "TORCH_VARIANT=cuda but torch.version.cuda is empty — refusing to label a CPU wheel as GPU"
+            )
+    else:
+        cuda_ver = "(not imported)"
     natives = _native_files(dist)
-    hits = [
-        p
-        for p in natives
-        if any(hint in p.name.lower() for hint in CUDA_NAME_HINTS)
-    ]
-    if len(hits) < 2:
+    hits = cuda_native_hits(natives)
+    if not cuda_runtime_complete(hits):
         sample = sorted({p.name for p in natives})[:30]
         raise SystemExit(
-            f"CUDA native libraries missing from {dist} (need cublas/cudnn/c10_cuda/torch_cuda). "
-            f"found_hints={ [p.name for p in hits] } sample={sample}"
+            f"CUDA native libraries missing from {dist} "
+            "(need torch_cuda + c10_cuda + cublas/cudnn/cudart as .dll/.pyd/.so, not headers). "
+            f"found_hints={[p.name for p in hits]} sample={sample}"
         )
     print(
         "cuda_bundle",

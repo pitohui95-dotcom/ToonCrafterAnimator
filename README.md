@@ -103,8 +103,9 @@ That produces `release/ToonCrafterAnimator/` with the onedir exe, `ffmpeg/`
 (LGPL build), `assets/`, `licenses/`, `README.txt`, `THIRD_PARTY_NOTICES.txt`,
 and `checksums.sha256`. The onedir also ships the vendored `ToonCrafter`
 package under `_internal/` (so `from ToonCrafter.utils.utils import …` works)
-and torchvision `_C_stable` (so `torchvision::nms` exists). CUDA builds also
-ship cublas/cudnn/`c10_cuda` / `torch_cuda` DLLs.
+and torchvision `_C.pyd` (cu121 0.20.x) or `_C_stable.pyd` (so
+`torchvision::nms` exists). CUDA builds also ship cublas / cudnn /
+`c10_cuda` / `torch_cuda` DLLs — not a CPU wheel labeled as GPU.
 
 Onedir is intentional. A onefile bundle of torch unpacks several GB to `%TEMP%`
 on every launch.
