@@ -293,6 +293,10 @@ ERR_NO_TORCH_STACK = (
     "ToonCrafter 推理需要 PyTorch、torchvision 和 omegaconf。"
     "请从 requirements.txt / requirements-torch.txt 安装。"
 )
+ERR_NO_TORCHVISION_NMS = (
+    "缺少 torchvision 的 C++ 算子（torchvision::nms）。"
+    "请安装与当前 torch 匹配的 torchvision，或重新打包 exe。"
+)
 ERR_NO_CLIP_CACHE = (
     "未找到 OpenCLIP 缓存。请在设置对话框中指定 open_clip_pytorch_model.bin — 本应用不会下载它。"
 )

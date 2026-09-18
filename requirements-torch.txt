@@ -15,3 +15,5 @@
 
 torch>=2.2
 torchvision>=0.17
+# torchvision must come from the same index as torch so the native
+# ``_C_stable`` / ``_C`` extension (torchvision::nms) matches.

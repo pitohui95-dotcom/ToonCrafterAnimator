@@ -92,6 +92,42 @@ def find_openclip_cache() -> Path | None:
     return None
 
 
+def ensure_torchvision_ops() -> None:
+    """Load torchvision's compiled ops so ``torch.ops.torchvision.nms`` exists.
+
+    ToonCrafter uses ``torchvision.transforms`` (Resize / CenterCrop) on the
+    keyframes. Importing torchvision also pulls CLIP / OpenCLIP helpers. The
+    C++ op ``torchvision::nms`` is registered only after the native extension
+    (``_C_stable`` / ``_C``) is loaded. PyInstaller onedir builds often ship
+    the Python modules and drop that extension, which surfaces mid-inference.
+    """
+    try:
+        import torch
+        import torchvision
+        import torchvision.ops  # noqa: F401
+        from torchvision.ops import nms as _nms  # noqa: F401
+    except ImportError as exc:
+        raise MissingDependency(t.ERR_NO_TORCH_STACK) from exc
+
+    op = getattr(getattr(torch.ops, "torchvision", None), "nms", None)
+    if op is None:
+        import importlib
+
+        for name in ("torchvision.extension", "torchvision._C", "torchvision._C_stable"):
+            try:
+                importlib.import_module(name)
+            except Exception:
+                continue
+        try:
+            import torchvision.ops as _ops  # noqa: F401
+            from torchvision.ops import nms as _nms2  # noqa: F401
+        except Exception:
+            pass
+        op = getattr(getattr(torch.ops, "torchvision", None), "nms", None)
+    if op is None:
+        raise MissingDependency(t.ERR_NO_TORCHVISION_NMS)
+
+
 def _require_torch():
     try:
         import torch
@@ -99,6 +135,7 @@ def _require_torch():
         from omegaconf import OmegaConf
     except ImportError as exc:
         raise MissingDependency(t.ERR_NO_TORCH_STACK) from exc
+    ensure_torchvision_ops()
     return torch, OmegaConf
 
 

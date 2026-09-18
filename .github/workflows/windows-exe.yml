@@ -52,6 +52,14 @@ jobs:
           foreach ($name in @("ffmpeg","assets","licenses","README.txt","THIRD_PARTY_NOTICES.txt","checksums.sha256")) {
             if (-not (Test-Path (Join-Path $root $name))) { throw "$name missing from release tree" }
           }
+          $tv = Get-ChildItem -Path $root -Recurse -Filter "torchvision" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $tv) { throw "torchvision package missing from onedir (nms ops)" }
+          $native = Get-ChildItem -Path $tv.FullName -File | Where-Object {
+            $_.Name -like "_C*" -or $_.Name -like "image_stable*" -or $_.Extension -in @(".pyd",".dll",".so")
+          }
+          if (-not $native) { throw "torchvision C++ extension (_C_stable/_C) missing; torchvision::nms will fail" }
+          Write-Host "torchvision native:"
+          $native | Format-Table Name, Length
           Get-Item $exe | Format-List FullName, Length, LastWriteTime
           Get-ChildItem $root | Format-Table Name, Length, Mode
           Write-Host "checksums.sha256 (head):"

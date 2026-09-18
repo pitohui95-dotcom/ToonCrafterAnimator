@@ -59,6 +59,19 @@ def _selftest() -> int:
                 "has_checkpoint": bool(settings.checkpoint_file),
             }
         )
+        if torch_available():
+            from tooncrafter_animator.inference.adapter import ensure_torchvision_ops
+
+            ensure_torchvision_ops()
+            import torch
+
+            report["torchvision_nms"] = bool(
+                getattr(getattr(torch.ops, "torchvision", None), "nms", None) is not None
+            )
+            if not report["torchvision_nms"]:
+                raise RuntimeError("torchvision::nms is not registered")
+        else:
+            report["torchvision_nms"] = None
         # Import UI offscreen to prove widgets construct.
         from PySide6.QtWidgets import QApplication
 
