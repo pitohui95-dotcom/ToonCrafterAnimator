@@ -18,7 +18,11 @@ from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
-ROOT = Path(SPECPATH).resolve().parents[1]
+# SPECPATH is the directory containing this spec file (not the spec path itself).
+_spec_dir = Path(SPECPATH).resolve()
+if _spec_dir.is_file():
+    _spec_dir = _spec_dir.parent
+ROOT = _spec_dir.parent
 SRC = ROOT / "src"
 ASSETS = SRC / "tooncrafter_animator" / "assets"
 VENDOR = SRC / "tooncrafter_animator" / "vendor"

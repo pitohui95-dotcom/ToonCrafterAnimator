@@ -6,17 +6,19 @@ import hashlib
 import io
 import os
 import sys
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
 
 # BtbN win64 lgpl static build. GPL builds must not be redistributed with this app.
-# "latest" is a rolling tag; the SHA-256 is recorded after a successful fetch so a
-# future run fails if the zip changes under our feet.
-DEFAULT_URL = (
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
-    "ffmpeg-n7.1-latest-win64-lgpl.zip"
+# "latest" is a rolling tag; n7.1 assets no longer exist on that tag.
+DEFAULT_URLS = (
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip",
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-8.1.zip",
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-lgpl-9.0.zip",
 )
+DEFAULT_URL = DEFAULT_URLS[0]
 
 # Filled in by `python packaging/fetch_ffmpeg.py --record-hash` after a verified download.
 EXPECTED_SHA256 = os.environ.get("TOONCRAFTER_FFMPEG_SHA256", "").strip()
@@ -37,10 +39,25 @@ def sha256_file(path: Path) -> str:
 def fetch(url: str, dest_dir: Path, expected: str = "") -> Path:
     dest_dir.mkdir(parents=True, exist_ok=True)
     zip_path = dest_dir / "ffmpeg-win64-lgpl.zip"
-    print(f"Downloading {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": "ToonCrafterAnimator-packaging"})
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        data = resp.read()
+    urls = [url] if url else list(DEFAULT_URLS)
+    if url and url == DEFAULT_URL:
+        urls = list(DEFAULT_URLS)
+    last_error: Exception | None = None
+    data = None
+    used = url
+    for used in urls:
+        print(f"Downloading {used}")
+        req = urllib.request.Request(used, headers={"User-Agent": "ToonCrafterAnimator-packaging"})
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                data = resp.read()
+            break
+        except urllib.error.HTTPError as exc:
+            print(f"  failed: HTTP {exc.code}")
+            last_error = exc
+            data = None
+    if data is None:
+        raise SystemExit(f"Could not download ffmpeg: {last_error}")
     zip_path.write_bytes(data)
     digest = hashlib.sha256(data).hexdigest()
     print(f"sha256 {digest}")

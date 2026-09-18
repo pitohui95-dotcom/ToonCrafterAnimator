@@ -41,11 +41,7 @@ jobs:
       - name: Generate icon, fetch LGPL ffmpeg, PyInstaller, assemble release
         env:
           PYTHONUTF8: "1"
-        run: |
-          python packaging/generate_icon.py
-          python packaging/fetch_ffmpeg.py
-          python -m PyInstaller --noconfirm --clean packaging/ToonCrafterAnimator.spec
-          python packaging/make_release.py --dist dist/ToonCrafterAnimator --ffmpeg-dir packaging/ffmpeg_cache
+        run: python packaging/ci_build.py
 
       - name: Verify release layout
         shell: pwsh
