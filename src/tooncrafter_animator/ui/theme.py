@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication
 
@@ -20,6 +21,14 @@ DISABLED_TEXT = "#8A8A8A"
 
 
 def apply_theme(app: QApplication) -> None:
+    locale = QLocale(QLocale.Language.Chinese, QLocale.Country.China)
+    QLocale.setDefault(locale)
+    translator = QTranslator(app)
+    trans_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    loaded = translator.load(locale, "qtbase", "_", trans_path) or translator.load("qtbase_zh_CN", trans_path)
+    if loaded:
+        app.installTranslator(translator)
+    app.setProperty("_ui_translator", translator)
     app.setStyle("Fusion")
     palette = QPalette()
     bg = QColor(BG)
@@ -45,11 +54,28 @@ def apply_theme(app: QApplication) -> None:
     palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(DISABLED_TEXT))
     palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(DISABLED_TEXT))
     app.setPalette(palette)
-    font = QFont("Segoe UI")
-    if font.family() != "Segoe UI":
-        font = QFont("Inter")
-    if not font.exactMatch():
-        font = QFont()
+    font = QFont()
+    try:
+        from PySide6.QtGui import QFontDatabase
+
+        available = set(QFontDatabase().families())
+        for name in (
+            "Microsoft YaHei UI",
+            "Microsoft YaHei",
+            "Noto Sans CJK SC",
+            "Noto Sans SC",
+            "Source Han Sans SC",
+            "WenQuanYi Micro Hei",
+            "文泉驿微米黑",
+            "PingFang SC",
+            "Segoe UI",
+            "Inter",
+        ):
+            if name in available:
+                font = QFont(name)
+                break
+    except Exception:
+        font = QFont("Segoe UI")
     font.setPointSize(10)
     app.setFont(font)
     app.setStyleSheet(_STYLESHEET)

@@ -28,12 +28,16 @@ def test_window_builds_and_interpolate_disabled(qapp, tmp_path, monkeypatch) -> 
     monkeypatch.setenv("TOONCRAFTER_APPDATA", str(tmp_path))
     win = MainWindow(settings=AppSettings(), show_setup=False)
     assert "ToonCrafter" in win.windowTitle()
+    assert win.run_btn.text() == "插帧"
     assert win.run_btn.isEnabled() is False
     tip = win.run_btn.toolTip()
-    assert "start keyframe" in tip.lower() or "Choose a start" in tip
+    assert "起始" in tip
     dlg = SetupDialog(AppSettings(), win)
-    assert "does not ship model weights" in dlg.layout().itemAt(0).widget().text().lower() or True
-    assert dlg.use_cache is not None
+    blurb = dlg.layout().itemAt(0).widget().text()
+    assert "不附带模型权重" in blurb
+    assert win.menuBar().actions()[0].text() == "文件(&F)"
+    assert win.preview.view.text() == "完成插帧后，帧预览会显示在这里。"
+    assert win.progress.status.text().startswith("空闲")
     win.close()
 
 

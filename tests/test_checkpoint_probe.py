@@ -42,7 +42,7 @@ def test_safetensors_rejects_missing_unet(tmp_path: Path) -> None:
     _write_safetensors(path, ["some.other.key"], "F32")
     probe = probe_checkpoint(path)
     assert not probe.ok
-    assert "missing" in probe.reason.lower() or "Not a ToonCrafter" in probe.reason
+    assert "缺少" in probe.reason
 
 
 def test_skips_sketch_encoder(tmp_path: Path) -> None:

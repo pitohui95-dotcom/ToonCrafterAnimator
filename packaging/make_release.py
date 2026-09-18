@@ -95,16 +95,16 @@ def main() -> int:
     readme_ff = ffmpeg_dest / "README.txt"
     if copied:
         readme_ff.write_text(
-            "LGPL ffmpeg build fetched by packaging/fetch_ffmpeg.py.\n"
-            "See licenses/LGPLv2.1.txt and THIRD_PARTY_NOTICES.txt.\n",
+            "由 packaging/fetch_ffmpeg.py 获取的 LGPL ffmpeg 构建。\n"
+            "详见 licenses/LGPLv2.1.txt 与 THIRD_PARTY_NOTICES.txt。\n",
             encoding="utf-8",
         )
     else:
         readme_ff.write_text(
-            "No ffmpeg binary in this tree.\n"
-            "On Windows, run packaging\\fetch_ffmpeg.py from build_exe.bat / .ps1\n"
-            "or copy an LGPL ffmpeg.exe into this folder.\n"
-            "GPL ffmpeg builds must not be redistributed with this app.\n",
+            "此目录中没有 ffmpeg 可执行文件。\n"
+            "在 Windows 上，请通过 build_exe.bat / .ps1 运行 packaging\\fetch_ffmpeg.py，\n"
+            "或将 LGPL 版 ffmpeg.exe 复制到此文件夹。\n"
+            "请勿将 GPL 版 ffmpeg 与本应用一起分发。\n",
             encoding="utf-8",
         )
 

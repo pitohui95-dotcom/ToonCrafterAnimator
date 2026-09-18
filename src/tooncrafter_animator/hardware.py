@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from tooncrafter_animator import copy as t
+
 
 @dataclass(frozen=True)
 class DeviceInfo:
@@ -35,14 +37,11 @@ def torch_available() -> bool:
 
 
 def list_devices() -> list[DeviceInfo]:
-    cpu_warning = (
-        "CPU inference of the 16-frame 3D UNet is extremely slow "
-        "(tens of minutes to hours per pass at 50 DDIM steps)."
-    )
+    cpu_warning = t.HW_CPU_SLOW
     devices = [
         DeviceInfo(
             id="cpu",
-            name="CPU",
+            name=t.DEVICE_CPU,
             kind="cpu",
             total_vram_bytes=None,
             warning=cpu_warning,
@@ -53,9 +52,9 @@ def list_devices() -> list[DeviceInfo]:
     except Exception:
         devices[0] = DeviceInfo(
             id="cpu",
-            name="CPU (PyTorch not installed)",
+            name=t.DEVICE_CPU_NO_TORCH,
             kind="cpu",
-            warning="Install PyTorch to run ToonCrafter. Interpolate stays disabled until then.",
+            warning=t.HW_NO_TORCH,
         )
         return devices
 
@@ -65,10 +64,7 @@ def list_devices() -> list[DeviceInfo]:
             vram = int(props.total_memory)
             warning = ""
             if vram < 11 * 1024**3:
-                warning = (
-                    f"Reported VRAM is {vram / 1024**3:.1f} GB. FP16 320×512 / 16-frame "
-                    "inference typically needs about 11–13 GB."
-                )
+                warning = t.HW_VRAM_SMALL.format(gb=vram / 1024**3)
             devices.append(
                 DeviceInfo(
                     id=f"cuda:{index}",
@@ -96,9 +92,9 @@ def default_precision(device_id: str) -> str:
 
 def precision_allowed(device_id: str, precision: str) -> tuple[bool, str]:
     if precision == "fp16" and not device_id.startswith("cuda"):
-        return False, "FP16 is only offered on CUDA. PyTorch has no usable FP16 CPU kernels for this graph."
+        return False, t.HW_FP16_CUDA_ONLY
     if precision not in {"fp16", "fp32"}:
-        return False, f"Unknown precision {precision!r}."
+        return False, t.HW_UNKNOWN_PRECISION.format(precision=precision)
     return True, ""
 
 
@@ -110,8 +106,11 @@ def vram_warning(device: DeviceInfo, precision: str) -> str:
     need = 12 * 1024**3 if precision == "fp16" else 22 * 1024**3
     if device.total_vram_bytes < need:
         return (
-            f"{device.name} has {device.total_vram_bytes / 1024**3:.1f} GB VRAM; "
-            f"{precision.upper()} interpolation typically needs about {need / 1024**3:.0f} GB. "
-            "The job may fail with an out-of-memory error."
+            t.HW_VRAM_MAY_OOM.format(
+                name=device.name,
+                have=device.total_vram_bytes / 1024**3,
+                precision=precision.upper(),
+                need=need / 1024**3,
+            )
         )
     return device.warning

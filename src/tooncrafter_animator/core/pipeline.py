@@ -4,6 +4,7 @@ import math
 from dataclasses import replace
 
 from tooncrafter_animator.core.models import FramePlan, PassSpec
+from tooncrafter_animator import copy as t
 
 FRAMES_PER_PASS = 16
 MAX_INTERMEDIATES = 14  # indices 1..14 of a 16-frame clip
@@ -56,7 +57,7 @@ def plan_intermediates(n: int) -> FramePlan:
     pick anchors, then one real pass per segment (no duplication, no blend).
     """
     if n < 0:
-        raise ValueError("Intermediate frame count cannot be negative.")
+        raise ValueError(t.ERR_NEGATIVE_INTERMEDIATES)
     if n == 0:
         return FramePlan(
             n_intermediates=0,
@@ -64,7 +65,7 @@ def plan_intermediates(n: int) -> FramePlan:
             scout=False,
             k_segments=0,
             passes=[],
-            description="No intermediate frames requested — nothing to generate.",
+            description=t.ERR_NO_INTERMEDIATES,
         )
     if n <= MAX_INTERMEDIATES:
         mid_local = evenly_spaced_indices(MAX_INTERMEDIATES, n)
@@ -75,10 +76,7 @@ def plan_intermediates(n: int) -> FramePlan:
             scout=False,
             k_segments=1,
             passes=[PassSpec(index=0, take_indices=take, include_end_anchor=False, source="user")],
-            description=(
-                f"One ToonCrafter pass (16 generated frames). "
-                f"Exporting {n} of the 14 in-betweens; every exported frame is model output."
-            ),
+            description=t.plan_single_pass(n),
         )
 
     k = math.ceil((n + 1) / 15)
@@ -113,10 +111,7 @@ def plan_intermediates(n: int) -> FramePlan:
         scout=True,
         k_segments=k,
         passes=passes,
-        description=(
-            f"{n_passes} real ToonCrafter passes: 1 scout to pick {k + 1} generated anchors, "
-            f"then {k} interpolations between them. No duplicated or blended frames."
-        ),
+        description=t.plan_chained(n_passes, k),
         anchor_indices=anchor_indices,
     )
 

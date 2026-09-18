@@ -12,6 +12,7 @@ from PIL import Image
 from tooncrafter_animator.core.errors import ExportError
 from tooncrafter_animator.core.ffmpeg import resolve_ffmpeg
 from tooncrafter_animator.core.images import array_to_image
+from tooncrafter_animator import copy as t
 
 
 def _fsync_dir(path: Path) -> None:
@@ -59,7 +60,7 @@ def _even_dims(frame: np.ndarray) -> np.ndarray:
     if new_w == w and new_h == h:
         return frame
     if new_w <= 0 or new_h <= 0:
-        raise ExportError("Frame is too small to encode as yuv420p (need even dimensions).")
+        raise ExportError(t.ERR_FRAME_TOO_SMALL)
     return frame[:new_h, :new_w]
 
 
@@ -67,9 +68,9 @@ def export_mp4(frames: list[np.ndarray], dest: Path, fps: int, ffmpeg_path: Path
     dest = Path(dest)
     ffmpeg = ffmpeg_path or resolve_ffmpeg()
     if ffmpeg is None:
-        raise ExportError("ffmpeg not found. Place an LGPL build in ffmpeg/ next to the app or set the path in settings.")
+        raise ExportError(t.ERR_NO_FFMPEG)
     if fps <= 0:
-        raise ExportError("FPS must be positive.")
+        raise ExportError(t.ERR_FPS_POSITIVE)
     even = [_even_dims(f) for f in frames]
     parent = dest.parent
     parent.mkdir(parents=True, exist_ok=True)
@@ -99,7 +100,7 @@ def export_mp4(frames: list[np.ndarray], dest: Path, fps: int, ffmpeg_path: Path
         ]
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
-            raise ExportError(f"ffmpeg MP4 encode failed: {proc.stderr[-2000:]}")
+            raise ExportError(t.ERR_FFMPEG_MP4.format(stderr=proc.stderr[-2000:]))
         _atomic_replace(staging, dest)
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -142,7 +143,7 @@ def export_gif(
                 text=True,
             )
             if gen.returncode != 0:
-                raise ExportError(f"ffmpeg palettegen failed: {gen.stderr[-2000:]}")
+                raise ExportError(t.ERR_FFMPEG_PALETTEGEN.format(stderr=gen.stderr[-2000:]))
             use = subprocess.run(
                 [
                     str(ffmpeg),
@@ -161,7 +162,7 @@ def export_gif(
                 text=True,
             )
             if use.returncode != 0:
-                raise ExportError(f"ffmpeg paletteuse failed: {use.stderr[-2000:]}")
+                raise ExportError(t.ERR_FFMPEG_PALETTEUSE.format(stderr=use.stderr[-2000:]))
             _atomic_replace(staging, dest)
             return dest
         finally:
@@ -170,7 +171,7 @@ def export_gif(
                 staging.unlink(missing_ok=True)
     images = [array_to_image(f) for f in frames]
     if not images:
-        raise ExportError("No frames to export.")
+        raise ExportError(t.ERR_NO_FRAMES)
     images[0].save(
         staging,
         format="GIF",

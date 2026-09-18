@@ -9,6 +9,7 @@ from typing import Any
 
 from tooncrafter_animator.core.errors import ProjectError
 from tooncrafter_animator.core.models import AspectMode, GenerationParams
+from tooncrafter_animator import copy as t
 
 PROJECT_SCHEMA = 1
 
@@ -113,19 +114,19 @@ def load_project(path: Path) -> ProjectFile:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise ProjectError(f"Could not read project file: {exc}") from exc
+        raise ProjectError(t.ERR_PROJECT_READ.format(exc=exc)) from exc
     if not isinstance(raw, dict):
-        raise ProjectError("Project file is not a JSON object.")
+        raise ProjectError(t.ERR_PROJECT_NOT_OBJECT)
     version = int(raw.get("schema_version", 0) or 0)
     if version != PROJECT_SCHEMA:
-        raise ProjectError(f"Unsupported project schema {version} (expected {PROJECT_SCHEMA}).")
+        raise ProjectError(t.ERR_PROJECT_SCHEMA.format(version=version, expected=PROJECT_SCHEMA))
     start = KeyframeRef(**{k: raw.get("start", {}).get(k, "") for k in ("absolute", "relative")})
     end = KeyframeRef(**{k: raw.get("end", {}).get(k, "") for k in ("absolute", "relative")})
     g = raw.get("generation") or {}
     try:
         aspect = AspectMode(g.get("aspect", "preserve"))
     except ValueError as exc:
-        raise ProjectError(f"Unknown aspect mode: {g.get('aspect')!r}") from exc
+        raise ProjectError(t.ERR_PROJECT_ASPECT.format(aspect=g.get("aspect"))) from exc
     generation = GenerationParams(
         output_width=int(g.get("output_width", 512)),
         output_height=int(g.get("output_height", 320)),

@@ -24,13 +24,14 @@ from tooncrafter_animator.core.checkpoints import discover_checkpoints, probe_ch
 from tooncrafter_animator.core.models import AspectMode, GenerationParams
 from tooncrafter_animator.core.pipeline import plan_intermediates
 from tooncrafter_animator.hardware import list_devices, precision_allowed, vram_warning
+from tooncrafter_animator import copy as t
 
 
 class SettingsPanel(QGroupBox):
     changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Generation", parent)
+        super().__init__(t.GROUP_GENERATION, parent)
         self._devices = list_devices()
 
         self.width_spin = QSpinBox()
@@ -38,31 +39,25 @@ class SettingsPanel(QGroupBox):
         self.width_spin.setSingleStep(8)
         self.width_spin.setValue(512)
         self.width_spin.setMinimumWidth(96)
-        self.width_spin.setAccessibleName("Output width")
+        self.width_spin.setAccessibleName(t.ACC_OUTPUT_WIDTH)
         self.height_spin = QSpinBox()
         self.height_spin.setRange(64, 4096)
         self.height_spin.setSingleStep(8)
         self.height_spin.setValue(320)
         self.height_spin.setMinimumWidth(96)
-        self.height_spin.setAccessibleName("Output height")
+        self.height_spin.setAccessibleName(t.ACC_OUTPUT_HEIGHT)
 
         self.aspect = QComboBox()
-        self.aspect.addItem("Preserve (fit, pad)", AspectMode.PRESERVE.value)
-        self.aspect.addItem("Crop (cover, centre-crop)", AspectMode.CROP.value)
-        self.aspect.setAccessibleName("Aspect mode")
-        self.aspect.setToolTip(
-            "Preserve fits the 320×512 generation inside your W×H and pads with the keyframe border colour. "
-            "Crop covers W×H and centre-crops the overflow."
-        )
+        self.aspect.addItem(t.ASPECT_PRESERVE, AspectMode.PRESERVE.value)
+        self.aspect.addItem(t.ASPECT_CROP, AspectMode.CROP.value)
+        self.aspect.setAccessibleName(t.ACC_ASPECT)
+        self.aspect.setToolTip(t.TIP_ASPECT)
 
         self.intermediates = QSpinBox()
         self.intermediates.setRange(1, 60)
         self.intermediates.setValue(14)
-        self.intermediates.setAccessibleName("Intermediate frame count")
-        self.intermediates.setToolTip(
-            "Number of in-between frames to export. One ToonCrafter pass produces 14 real in-betweens. "
-            "Asking for more runs additional real passes between generated anchors — never duplicates or blends."
-        )
+        self.intermediates.setAccessibleName(t.ACC_INTERMEDIATES)
+        self.intermediates.setToolTip(t.TIP_INTERMEDIATES)
         self.plan_label = QLabel()
         self.plan_label.setWordWrap(True)
         self.plan_label.setObjectName("hint")
@@ -70,124 +65,116 @@ class SettingsPanel(QGroupBox):
         self.fps = QSpinBox()
         self.fps.setRange(1, 60)
         self.fps.setValue(8)
-        self.fps.setAccessibleName("Playback FPS")
+        self.fps.setAccessibleName(t.ACC_FPS)
 
         self.seed = QSpinBox()
         self.seed.setRange(0, 2_147_483_647)
         self.seed.setValue(123)
-        self.seed.setAccessibleName("Seed")
+        self.seed.setAccessibleName(t.ACC_SEED)
 
         self.steps = QSpinBox()
         self.steps.setRange(1, 60)
         self.steps.setValue(50)
-        self.steps.setAccessibleName("DDIM steps")
-        self.steps.setToolTip("DDIM denoising steps. Upstream default is 50; the node caps at 60.")
+        self.steps.setAccessibleName(t.ACC_STEPS)
+        self.steps.setToolTip(t.TIP_STEPS)
 
         self.cfg = QDoubleSpinBox()
         self.cfg.setRange(1.0, 15.0)
         self.cfg.setSingleStep(0.5)
         self.cfg.setValue(7.5)
-        self.cfg.setAccessibleName("Classifier-free guidance scale")
-        self.cfg.setToolTip(
-            "unconditional_guidance_scale. The 512-interp config uses uncond_type=empty_seq; default 7.5."
-        )
+        self.cfg.setAccessibleName(t.ACC_CFG)
+        self.cfg.setToolTip(t.TIP_CFG)
 
         self.eta = QDoubleSpinBox()
         self.eta.setRange(0.0, 15.0)
         self.eta.setSingleStep(0.1)
         self.eta.setValue(1.0)
-        self.eta.setAccessibleName("DDIM eta")
+        self.eta.setAccessibleName(t.ACC_ETA)
 
         self.motion = QSpinBox()
         self.motion.setRange(5, 30)
         self.motion.setValue(10)
-        self.motion.setAccessibleName("Motion frame stride")
-        self.motion.setToolTip(
-            "This is the model's FPS / frame-stride condition (the ComfyUI node mislabels it as frame_count). "
-            "Recommended 5–30. Smaller values produce larger motion."
-        )
+        self.motion.setAccessibleName(t.ACC_MOTION)
+        self.motion.setToolTip(t.TIP_MOTION)
 
         self.gen_size = QComboBox()
-        self.gen_size.addItem("320×512 (trained)", (320, 512))
-        self.gen_size.addItem("256×256 (off-distribution)", (256, 256))
-        self.gen_size.addItem("320×320 (off-distribution)", (320, 320))
-        self.gen_size.addItem("576×1024 (off-distribution, 1024-class)", (576, 1024))
-        self.gen_size.setAccessibleName("Generation resolution")
-        self.gen_size.setToolTip(
-            "The UNet is convolutional and will run at other 64-divisible sizes, but it was trained at 320×512. "
-            "Other sizes are flagged off-distribution."
-        )
+        self.gen_size.addItem(t.GEN_TRAINED, (320, 512))
+        self.gen_size.addItem(t.GEN_OFF_256, (256, 256))
+        self.gen_size.addItem(t.GEN_OFF_320, (320, 320))
+        self.gen_size.addItem(t.GEN_OFF_1024, (576, 1024))
+        self.gen_size.setAccessibleName(t.ACC_GEN_SIZE)
+        self.gen_size.setToolTip(t.TIP_GEN_SIZE)
         self.offdist = QLabel("")
         self.offdist.setWordWrap(True)
         self.offdist.setStyleSheet("color: #FFE082;")
 
         self.device = QComboBox()
-        self.device.setAccessibleName("Device")
+        self.device.setAccessibleName(t.ACC_DEVICE)
         for info in self._devices:
             label = info.name if info.id == "cpu" else f"{info.name} ({info.id})"
             self.device.addItem(label, info.id)
 
         self.precision = QComboBox()
-        self.precision.addItem("FP16 (CUDA)", "fp16")
-        self.precision.addItem("FP32", "fp32")
-        self.precision.setAccessibleName("Precision")
+        self.precision.addItem(t.PRECISION_FP16, "fp16")
+        self.precision.addItem(t.PRECISION_FP32, "fp32")
+        self.precision.setAccessibleName(t.ACC_PRECISION)
 
         self.vram = QComboBox()
-        self.vram.addItem("None", "none")
-        self.vram.addItem("Low VRAM (TOON_MEM_STRATEGY=low)", "low")
-        self.vram.setAccessibleName("VRAM strategy")
-        self.vram.setToolTip("Upstream ToonCrafter memory strategy used during VAE decode. Does not substitute the model.")
+        self.vram.addItem(t.VRAM_NONE, "none")
+        self.vram.addItem(t.VRAM_LOW, "low")
+        self.vram.setAccessibleName(t.ACC_VRAM)
+        self.vram.setToolTip(t.TIP_VRAM)
 
         self.hw_warning = QLabel("")
         self.hw_warning.setWordWrap(True)
         self.hw_warning.setStyleSheet("color: #FFE082;")
 
         self.prompt = QPlainTextEdit()
-        self.prompt.setPlaceholderText("Optional text prompt (empty string is in-distribution).")
-        self.prompt.setAccessibleName("Text prompt")
+        self.prompt.setPlaceholderText(t.PROMPT_PLACEHOLDER)
+        self.prompt.setAccessibleName(t.ACC_PROMPT)
         self.prompt.setFixedHeight(64)
 
         self.ckpt_folder = QLineEdit()
         self.ckpt_folder.setReadOnly(True)
-        self.ckpt_folder.setAccessibleName("Checkpoint folder")
-        browse_folder = QPushButton("Folder…")
-        browse_folder.setAccessibleName("Choose checkpoint folder")
+        self.ckpt_folder.setAccessibleName(t.ACC_CKPT_FOLDER)
+        browse_folder = QPushButton(t.BTN_FOLDER)
+        browse_folder.setAccessibleName(t.ACC_CHOOSE_CKPT_FOLDER)
         browse_folder.clicked.connect(self._browse_folder)
 
         self.ckpt = QComboBox()
-        self.ckpt.setAccessibleName("Checkpoint file")
-        self.ckpt_status = QLabel("No checkpoint selected.")
+        self.ckpt.setAccessibleName(t.ACC_CKPT_FILE)
+        self.ckpt_status = QLabel(t.NO_CHECKPOINT)
         self.ckpt_status.setWordWrap(True)
 
         self.clip_path = QLineEdit()
         self.clip_path.setReadOnly(True)
-        self.clip_path.setAccessibleName("OpenCLIP weights")
-        browse_clip = QPushButton("CLIP…")
-        browse_clip.setAccessibleName("Choose OpenCLIP weights")
+        self.clip_path.setAccessibleName(t.ACC_OPENCLIP)
+        browse_clip = QPushButton(t.BTN_CLIP)
+        browse_clip.setAccessibleName(t.ACC_CHOOSE_OPENCLIP)
         browse_clip.clicked.connect(self._browse_clip)
-        self.use_cache = QCheckBox("Use an OpenCLIP cache already on this machine (never download)")
-        self.use_cache.setAccessibleName("Use existing OpenCLIP cache")
+        self.use_cache = QCheckBox(t.USE_OPENCLIP_CACHE)
+        self.use_cache.setAccessibleName(t.ACC_USE_CACHE)
 
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        form.addRow("Output width", self.width_spin)
-        form.addRow("Output height", self.height_spin)
-        form.addRow("Aspect", self.aspect)
-        form.addRow("In-betweens", self.intermediates)
+        form.addRow(t.LABEL_OUTPUT_WIDTH, self.width_spin)
+        form.addRow(t.LABEL_OUTPUT_HEIGHT, self.height_spin)
+        form.addRow(t.LABEL_ASPECT, self.aspect)
+        form.addRow(t.LABEL_INTERMEDIATES, self.intermediates)
         form.addRow("", self.plan_label)
-        form.addRow("FPS", self.fps)
-        form.addRow("Seed", self.seed)
-        form.addRow("Steps", self.steps)
-        form.addRow("Guidance", self.cfg)
-        form.addRow("Eta", self.eta)
-        form.addRow("Motion (fs)", self.motion)
-        form.addRow("Generate at", self.gen_size)
+        form.addRow(t.LABEL_FPS, self.fps)
+        form.addRow(t.LABEL_SEED, self.seed)
+        form.addRow(t.LABEL_STEPS, self.steps)
+        form.addRow(t.LABEL_GUIDANCE, self.cfg)
+        form.addRow(t.LABEL_ETA, self.eta)
+        form.addRow(t.LABEL_MOTION, self.motion)
+        form.addRow(t.LABEL_GENERATE_AT, self.gen_size)
         form.addRow("", self.offdist)
-        form.addRow("Device", self.device)
-        form.addRow("Precision", self.precision)
-        form.addRow("VRAM", self.vram)
+        form.addRow(t.LABEL_DEVICE, self.device)
+        form.addRow(t.LABEL_PRECISION, self.precision)
+        form.addRow(t.LABEL_VRAM, self.vram)
         form.addRow("", self.hw_warning)
-        form.addRow("Prompt", self.prompt)
+        form.addRow(t.LABEL_PROMPT, self.prompt)
 
         ckpt_row = QHBoxLayout()
         ckpt_row.addWidget(self.ckpt_folder, 1)
@@ -198,11 +185,11 @@ class SettingsPanel(QGroupBox):
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
-        layout.addWidget(QLabel("Checkpoint folder"))
+        layout.addWidget(QLabel(t.LABEL_CHECKPOINT_FOLDER))
         layout.addLayout(ckpt_row)
         layout.addWidget(self.ckpt)
         layout.addWidget(self.ckpt_status)
-        layout.addWidget(QLabel("OpenCLIP weights (open_clip_pytorch_model.bin)"))
+        layout.addWidget(QLabel(t.LABEL_OPENCLIP))
         layout.addLayout(clip_row)
         layout.addWidget(self.use_cache)
 
@@ -244,7 +231,7 @@ class SettingsPanel(QGroupBox):
         self.plan_label.setText(plan.description)
         gen = self.gen_size.currentData()
         if gen and gen != (320, 512):
-            self.offdist.setText("Off-distribution size: the 512-interp UNet was trained at 320×512.")
+            self.offdist.setText(t.OFFDIST_SIZE)
         else:
             self.offdist.setText("")
         device_id = self.device.currentData() or "cpu"
@@ -268,13 +255,13 @@ class SettingsPanel(QGroupBox):
         self.changed.emit()
 
     def _browse_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Checkpoint folder")
+        folder = QFileDialog.getExistingDirectory(self, t.TITLE_CHECKPOINT_FOLDER)
         if folder:
             self.set_checkpoint_folder(Path(folder))
 
     def _browse_clip(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "OpenCLIP weights", "", "OpenCLIP weights (*.bin *.safetensors *.pt);;All files (*)"
+            self, t.TITLE_OPENCLIP, "", t.FILTER_OPENCLIP
         )
         if path:
             self.clip_path.setText(path)
@@ -288,7 +275,7 @@ class SettingsPanel(QGroupBox):
             self.ckpt.addItem(path.name, str(path))
         self.ckpt.blockSignals(False)
         if self.ckpt.count() == 0:
-            self.ckpt_status.setText("No .ckpt / .safetensors files in that folder (sketch_encoder.ckpt is ignored).")
+            self.ckpt_status.setText(t.NO_CKPT_IN_FOLDER)
         else:
             self._on_ckpt()
         self.changed.emit()
@@ -296,7 +283,7 @@ class SettingsPanel(QGroupBox):
     def _on_ckpt(self) -> None:
         path = self.ckpt.currentData()
         if not path:
-            self.ckpt_status.setText("No checkpoint selected.")
+            self.ckpt_status.setText(t.NO_CHECKPOINT)
             self.changed.emit()
             return
         probe = probe_checkpoint(Path(path))

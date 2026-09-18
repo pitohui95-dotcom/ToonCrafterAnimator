@@ -6,6 +6,7 @@ import zipfile
 from pathlib import Path
 
 from tooncrafter_animator.core.models import CheckpointProbe
+from tooncrafter_animator import copy as t
 
 CHECKPOINT_GLOBS = ("*.ckpt", "*.pt", "*.pth", "*.bin", "*.safetensors")
 SKIP_NAMES = {"sketch_encoder.ckpt"}
@@ -43,23 +44,23 @@ def discover_checkpoints(folder: Path) -> list[Path]:
 def probe_checkpoint(path: Path) -> CheckpointProbe:
     path = Path(path)
     if not path.is_file():
-        return CheckpointProbe(path, False, "File does not exist.", 0, "unknown", "unknown")
+        return CheckpointProbe(path, False, t.CKPT_MISSING_FILE, 0, "unknown", "unknown")
     size = path.stat().st_size
     suffix = path.suffix.lower()
     if suffix == ".safetensors":
         return _probe_safetensors(path, size)
     if suffix in {".ckpt", ".pt", ".pth", ".bin"}:
         return _probe_torch_archive(path, size)
-    return CheckpointProbe(path, False, f"Unsupported extension {suffix}.", size, "unknown", "unknown")
+    return CheckpointProbe(path, False, t.CKPT_BAD_EXT.format(suffix=suffix), size, "unknown", "unknown")
 
 
 def _probe_safetensors(path: Path, size: int) -> CheckpointProbe:
     try:
         header_len, keys, dtypes = _read_safetensors_header(path)
     except Exception as exc:  # noqa: BLE001
-        return CheckpointProbe(path, False, f"Not a valid safetensors file: {exc}", size, "safetensors", "unknown")
+        return CheckpointProbe(path, False, t.CKPT_BAD_SAFETENSORS.format(exc=exc), size, "safetensors", "unknown")
     if header_len <= 0:
-        return CheckpointProbe(path, False, "Empty safetensors header.", size, "safetensors", "unknown")
+        return CheckpointProbe(path, False, t.CKPT_EMPTY_HEADER, size, "safetensors", "unknown")
     return _evaluate_keys(path, size, "safetensors", keys, dtypes)
 
 
@@ -85,7 +86,7 @@ def _probe_torch_archive(path: Path, size: int) -> CheckpointProbe:
         return CheckpointProbe(
             path,
             False,
-            "Not a zip-based PyTorch archive. Legacy pickle checkpoints cannot be validated without loading.",
+            t.CKPT_NOT_ZIP,
             size,
             "ckpt",
             "unknown",
@@ -93,13 +94,13 @@ def _probe_torch_archive(path: Path, size: int) -> CheckpointProbe:
     with zipfile.ZipFile(path) as zf:
         names = zf.namelist()
     if not any(name.endswith("data.pkl") for name in names):
-        return CheckpointProbe(path, False, "Zip archive is missing data.pkl (not a PyTorch checkpoint).", size, "ckpt", "unknown")
+        return CheckpointProbe(path, False, t.CKPT_NO_PKL, size, "ckpt", "unknown")
     keys, dtypes = _torch_keys(path)
     if keys is None:
         return CheckpointProbe(
             path,
             False,
-            "PyTorch archive structure looks valid, but key names cannot be read without PyTorch. Install torch to validate.",
+            t.CKPT_NEED_TORCH,
             size,
             "ckpt",
             "unknown",
@@ -165,9 +166,7 @@ def _evaluate_keys(
         return CheckpointProbe(
             path,
             False,
-            "Not a ToonCrafter interpolation checkpoint (missing "
-            + ", ".join(missing)
-            + ").",
+            t.CKPT_MISSING_MARKERS.format(missing=", ".join(missing)),
             size,
             fmt,
             family,
@@ -178,18 +177,18 @@ def _evaluate_keys(
         return CheckpointProbe(
             path,
             False,
-            "Checkpoint is missing fps_embedding / framestride_embed (not the interp UNet).",
+            t.CKPT_MISSING_STRIDE,
             size,
             fmt,
             family,
             keys_checked=len(keys),
             marker_hits=tuple(hits),
         )
-    size_note = f"{size / (1024**3):.1f} GB" if size else "unknown size"
+    size_note = f"{size / (1024**3):.1f} GB" if size else t.CKPT_UNKNOWN_SIZE
     return CheckpointProbe(
         path,
         True,
-        f"Looks like a ToonCrafter interpolation checkpoint ({size_note}, {family or 'unknown'} weights).",
+        t.CKPT_OK.format(size=size_note, family=family or "unknown"),
         size,
         fmt,
         family,

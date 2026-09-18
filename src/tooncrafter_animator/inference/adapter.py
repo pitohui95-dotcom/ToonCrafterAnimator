@@ -30,6 +30,7 @@ from tooncrafter_animator.core.models import (
 from tooncrafter_animator.hardware import precision_allowed
 from tooncrafter_animator.memory import release_torch_memory
 from tooncrafter_animator.paths import inference_config_path, vendor_root
+from tooncrafter_animator import copy as t
 
 log = logging.getLogger("tooncrafter")
 
@@ -97,10 +98,7 @@ def _require_torch():
         import torchvision  # noqa: F401
         from omegaconf import OmegaConf
     except ImportError as exc:
-        raise MissingDependency(
-            "PyTorch, torchvision and omegaconf are required for ToonCrafter inference. "
-            "Install them from requirements.txt / requirements-torch.txt."
-        ) from exc
+        raise MissingDependency(t.ERR_NO_TORCH_STACK) from exc
     return torch, OmegaConf
 
 
@@ -145,16 +143,9 @@ class ToonCrafterAdapter:
         if clip_path is None and plan.use_openclip_cache:
             clip_path = find_openclip_cache()
             if clip_path is None:
-                raise CheckpointError(
-                    "OpenCLIP cache not found. Point the setup dialog at "
-                    "open_clip_pytorch_model.bin — the app will not download it."
-                )
+                raise CheckpointError(t.ERR_NO_CLIP_CACHE)
         if clip_path is None or not Path(clip_path).is_file():
-            raise CheckpointError(
-                "OpenCLIP weights are required for offline inference "
-                "(ViT-H-14 / laion2b_s32b_b79k, open_clip_pytorch_model.bin, ~4 GB). "
-                "This app never downloads them."
-            )
+            raise CheckpointError(t.ERR_CLIP_REQUIRED)
 
         ensure_vendor_on_path()
         os.environ["USER_DEF_CLIP"] = str(Path(clip_path).resolve())
@@ -167,23 +158,23 @@ class ToonCrafterAdapter:
 
         config_file = inference_config_path()
         if not config_file.is_file():
-            raise CheckpointError(f"Missing inference config: {config_file}")
-        stage("Reading inference_512_v1.0.yaml")
+            raise CheckpointError(t.ERR_MISSING_CONFIG.format(path=config_file))
+        stage(t.STAGE_READ_YAML)
         config = OmegaConf.load(config_file.as_posix())
         model_config = config.pop("model", OmegaConf.create())
         model_config["params"]["unet_config"]["params"]["use_checkpoint"] = False
 
-        stage("Instantiating LatentVisualDiffusion (this loads OpenCLIP from your local file)")
+        stage(t.STAGE_INSTANTIATE)
         model = instantiate_from_config(model_config)
-        stage(f"Loading checkpoint {plan.checkpoint.name}")
+        stage(t.STAGE_LOAD_CKPT.format(name=plan.checkpoint.name))
         model = load_model_checkpoint(model, Path(plan.checkpoint))
         model.eval()
 
         device = _resolve_device(torch, plan.device)
         if plan.precision == "fp16":
-            stage("Casting model to FP16")
+            stage(t.STAGE_CAST_FP16)
             model = model.half()
-        stage(f"Moving model to {device}")
+        stage(t.STAGE_MOVE.format(device=device))
         model = model.to(device)
 
         temporal = int(getattr(model, "temporal_length", FRAMES_PER_PASS))
@@ -199,7 +190,7 @@ class ToonCrafterAdapter:
         )
         self._model = model
         self._info = info
-        stage("Checkpoint ready")
+        stage(t.STAGE_READY)
         return info
 
     def unload(self) -> None:
@@ -228,7 +219,7 @@ class ToonCrafterAdapter:
     ) -> np.ndarray:
         """Run one real ToonCrafter pass. Returns uint8 array shaped (16, H, W, 3)."""
         if self._model is None:
-            raise CheckpointError("Model is not loaded.")
+            raise CheckpointError(t.ERR_MODEL_NOT_LOADED)
         torch = self._torch
         if torch is None:
             torch, _ = _require_torch()
@@ -281,7 +272,7 @@ class ToonCrafterAdapter:
                         n_passes=n_passes,
                         step=step + 1,
                         n_steps=job.steps,
-                        message=f"DDIM step {step + 1}/{job.steps}",
+                        message=t.STATUS_DDIM.format(step=step + 1, n_steps=job.steps),
                     )
                 )
 
@@ -357,7 +348,7 @@ def _resolve_device(torch, spec: str):
         return torch.device("cpu")
     if spec.startswith("cuda"):
         if not torch.cuda.is_available():
-            raise CheckpointError("CUDA was requested but torch.cuda.is_available() is False.")
+            raise CheckpointError(t.ERR_CUDA_UNAVAILABLE)
         return torch.device(spec)
     return torch.device(spec)
 

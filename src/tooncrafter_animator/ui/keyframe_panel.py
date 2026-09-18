@@ -15,51 +15,49 @@ from PySide6.QtWidgets import (
 )
 
 from tooncrafter_animator.ui.widgets.drop_label import IMAGE_FILTER, DropPixmap
+from tooncrafter_animator import copy as t
 
 
 class KeyframePanel(QGroupBox):
     changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Keyframes", parent)
+        super().__init__(t.GROUP_KEYFRAMES, parent)
         self.start_path: Path | None = None
         self.end_path: Path | None = None
 
-        self.start_view = DropPixmap("Drop a start keyframe\nor click to browse")
-        self.end_view = DropPixmap("Drop an end keyframe\nor click to browse")
-        self.start_view.setAccessibleName("Start keyframe preview")
-        self.end_view.setAccessibleName("End keyframe preview")
+        self.start_view = DropPixmap(t.DROP_START)
+        self.end_view = DropPixmap(t.DROP_END)
+        self.start_view.setAccessibleName(t.ACC_START_PREVIEW)
+        self.end_view.setAccessibleName(t.ACC_END_PREVIEW)
         self.start_view.clicked.connect(lambda: self._browse("start"))
         self.end_view.clicked.connect(lambda: self._browse("end"))
         self.start_view.files_dropped.connect(lambda files: self._set("start", files[0]))
         self.end_view.files_dropped.connect(lambda files: self._set("end", files[0]))
 
-        pick_start = QPushButton("Choose start…")
-        pick_start.setAccessibleName("Choose start keyframe")
+        pick_start = QPushButton(t.BTN_CHOOSE_START)
+        pick_start.setAccessibleName(t.ACC_CHOOSE_START)
         pick_start.clicked.connect(lambda: self._browse("start"))
-        pick_end = QPushButton("Choose end…")
-        pick_end.setAccessibleName("Choose end keyframe")
+        pick_end = QPushButton(t.BTN_CHOOSE_END)
+        pick_end.setAccessibleName(t.ACC_CHOOSE_END)
         pick_end.clicked.connect(lambda: self._browse("end"))
 
-        swap = QPushButton("Swap")
-        swap.setAccessibleName("Swap start and end keyframes")
-        swap.setToolTip("Swap the start and end keyframes.")
+        swap = QPushButton(t.BTN_SWAP)
+        swap.setAccessibleName(t.ACC_SWAP)
+        swap.setToolTip(t.TIP_SWAP)
         swap.clicked.connect(self.swap)
-        clear = QPushButton("Clear")
-        clear.setAccessibleName("Clear keyframes")
+        clear = QPushButton(t.BTN_CLEAR)
+        clear.setAccessibleName(t.ACC_CLEAR)
         clear.clicked.connect(self.clear)
 
-        self.note = QLabel(
-            "Generation always runs at 320×512 (the 512-interp checkpoint). "
-            "Your output width/height is applied afterwards."
-        )
+        self.note = QLabel(t.KEYFRAME_NOTE)
         self.note.setWordWrap(True)
         self.note.setObjectName("hint")
         self.note.setProperty("class", "hint")
 
         grid = QGridLayout()
-        grid.addWidget(QLabel("Start"), 0, 0)
-        grid.addWidget(QLabel("End"), 0, 1)
+        grid.addWidget(QLabel(t.LABEL_START), 0, 0)
+        grid.addWidget(QLabel(t.LABEL_END), 0, 1)
         grid.addWidget(self.start_view, 1, 0)
         grid.addWidget(self.end_view, 1, 1)
         grid.addWidget(pick_start, 2, 0)
@@ -76,7 +74,7 @@ class KeyframePanel(QGroupBox):
         layout.addWidget(self.note)
 
     def _browse(self, which: str) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Choose keyframe", "", IMAGE_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, t.TITLE_CHOOSE_KEYFRAME, "", IMAGE_FILTER)
         if path:
             self._set(which, Path(path))
 

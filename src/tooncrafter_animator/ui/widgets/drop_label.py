@@ -6,7 +6,9 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPixmap
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
-IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.webp *.bmp)"
+from tooncrafter_animator import copy as t
+
+IMAGE_FILTER = t.FILTER_IMAGES
 
 
 class DropPixmap(QLabel):
@@ -63,7 +65,7 @@ class DropPixmap(QLabel):
             return
         pix = QPixmap(str(path))
         if pix.isNull():
-            self.setText(f"Could not read\n{path.name}")
+            self.setText(t.ERR_COULD_NOT_READ.format(name=path.name))
             return
         self.setText("")
         self.setPixmap(pix.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))

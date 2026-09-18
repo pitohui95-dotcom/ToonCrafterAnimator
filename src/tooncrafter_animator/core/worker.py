@@ -19,6 +19,7 @@ from tooncrafter_animator.core.models import (
 )
 from tooncrafter_animator.core.pipeline import FRAMES_PER_PASS, plan_intermediates
 from tooncrafter_animator.memory import release_torch_memory
+from tooncrafter_animator import copy as t
 
 log = logging.getLogger("tooncrafter")
 
@@ -65,7 +66,7 @@ class InferenceWorker(QObject):
                 return
 
             adapter = ToonCrafterAdapter()
-            self.staged.emit("Loading ToonCrafter checkpoint…")
+            self.staged.emit(t.STATUS_LOADING_CKPT)
             adapter.load(self.load, on_stage=lambda msg: self.staged.emit(msg))
             self.token.raise_if_cancelled()
 
@@ -103,7 +104,7 @@ class InferenceWorker(QObject):
                 native_start_end = (clip[0], clip[-1])
                 assembled = [start] + mids + [end]
             else:
-                self.staged.emit("Scout pass — generating anchor frames…")
+                self.staged.emit(t.STATUS_SCOUT)
                 scout = adapter.interpolate(
                     make_request(start, end),
                     progress=on_progress,
@@ -112,7 +113,7 @@ class InferenceWorker(QObject):
                     n_passes=plan.n_passes,
                 )
                 if scout.shape[0] != FRAMES_PER_PASS:
-                    raise RuntimeError(f"Scout pass returned {scout.shape[0]} frames, expected {FRAMES_PER_PASS}.")
+                    raise RuntimeError(t.ERR_SCOUT_FRAMES.format(got=scout.shape[0], expected=FRAMES_PER_PASS))
                 anchors = [scout[i] for i in plan.anchor_indices]
                 mids: list[np.ndarray] = []
                 for i, spec in enumerate(plan.passes):

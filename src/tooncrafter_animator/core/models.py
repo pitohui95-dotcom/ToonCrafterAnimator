@@ -155,5 +155,6 @@ class CancellationToken:
     def raise_if_cancelled(self) -> None:
         if self._cancelled:
             from tooncrafter_animator.core.errors import InferenceCancelled
+            from tooncrafter_animator import copy as t
 
-            raise InferenceCancelled("Interpolation cancelled.")
+            raise InferenceCancelled(t.ERR_CANCELLED)

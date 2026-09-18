@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from tooncrafter_animator import APP_DISPLAY_NAME, __version__
+from tooncrafter_animator import APP_DISPLAY_NAME, __version__, copy as t
 from tooncrafter_animator.core.checkpoints import probe_checkpoint
 from tooncrafter_animator.core.export import export_gif, export_mp4, export_png_sequence
 from tooncrafter_animator.core.ffmpeg import resolve_ffmpeg
@@ -67,12 +67,12 @@ class MainWindow(QMainWindow):
 
         from PySide6.QtWidgets import QPushButton
 
-        self.run_btn = QPushButton("Interpolate")
+        self.run_btn = QPushButton(t.BTN_INTERPOLATE)
         self.run_btn.setObjectName("primary")
-        self.run_btn.setAccessibleName("Interpolate")
+        self.run_btn.setAccessibleName(t.BTN_INTERPOLATE_ACCESSIBLE)
         self.run_btn.clicked.connect(self.start_job)
-        self.setup_btn = QPushButton("Checkpoint setup…")
-        self.setup_btn.setAccessibleName("Open checkpoint setup")
+        self.setup_btn = QPushButton(t.BTN_SETUP)
+        self.setup_btn.setAccessibleName(t.BTN_SETUP_ACCESSIBLE)
         self.setup_btn.clicked.connect(self.open_setup)
 
         actions = QHBoxLayout()
@@ -125,16 +125,16 @@ class MainWindow(QMainWindow):
             self._needs_setup = False
 
     def _build_menu(self) -> None:
-        file_menu = self.menuBar().addMenu("&File")
-        open_p = QAction("Open project…", self)
+        file_menu = self.menuBar().addMenu(t.MENU_FILE)
+        open_p = QAction(t.ACTION_OPEN_PROJECT, self)
         open_p.setShortcut(QKeySequence.Open)
         open_p.triggered.connect(self.open_project)
-        save_p = QAction("Save project…", self)
+        save_p = QAction(t.ACTION_SAVE_PROJECT, self)
         save_p.setShortcut(QKeySequence.Save)
         save_p.triggered.connect(self.save_project)
-        setup = QAction("Checkpoint setup…", self)
+        setup = QAction(t.ACTION_CHECKPOINT_SETUP, self)
         setup.triggered.connect(self.open_setup)
-        quit_a = QAction("Quit", self)
+        quit_a = QAction(t.ACTION_QUIT, self)
         quit_a.setShortcut(QKeySequence.Quit)
         quit_a.triggered.connect(self.close)
         file_menu.addAction(open_p)
@@ -144,18 +144,18 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(quit_a)
 
-        run_menu = self.menuBar().addMenu("&Run")
-        go = QAction("Interpolate", self)
+        run_menu = self.menuBar().addMenu(t.MENU_RUN)
+        go = QAction(t.ACTION_INTERPOLATE, self)
         go.setShortcut(QKeySequence("Ctrl+Return"))
         go.triggered.connect(self.start_job)
-        cancel = QAction("Cancel", self)
+        cancel = QAction(t.ACTION_CANCEL, self)
         cancel.setShortcut(QKeySequence("Escape"))
         cancel.triggered.connect(self.cancel_job)
         run_menu.addAction(go)
         run_menu.addAction(cancel)
 
-        help_menu = self.menuBar().addMenu("&Help")
-        about = QAction("About", self)
+        help_menu = self.menuBar().addMenu(t.MENU_HELP)
+        about = QAction(t.ACTION_ABOUT, self)
         about.triggered.connect(self._about)
         help_menu.addAction(about)
 
@@ -188,40 +188,40 @@ class MainWindow(QMainWindow):
     def _blockers(self) -> list[str]:
         reasons: list[str] = []
         if self.worker_host.is_running():
-            reasons.append("A job is already running.")
+            reasons.append(t.BLOCK_RUNNING)
         if self.keyframes.start_path is None or not self.keyframes.start_path.is_file():
-            reasons.append("Choose a start keyframe.")
+            reasons.append(t.BLOCK_START)
         if self.keyframes.end_path is None or not self.keyframes.end_path.is_file():
-            reasons.append("Choose an end keyframe.")
+            reasons.append(t.BLOCK_END)
         if not torch_available():
-            reasons.append("PyTorch is not installed, so real ToonCrafter inference cannot run.")
+            reasons.append(t.BLOCK_NO_TORCH)
         ckpt = self.gen.selected_checkpoint()
         if ckpt is None:
-            reasons.append("Select a validated ToonCrafter checkpoint.")
+            reasons.append(t.BLOCK_SELECT_CKPT)
         else:
             probe = probe_checkpoint(ckpt)
             if not probe.ok:
                 reasons.append(probe.reason)
         clip = self.gen.selected_clip()
         if not (clip and clip.is_file()) and not self.gen.use_cache.isChecked():
-            reasons.append("Select OpenCLIP weights, or enable the local-cache option after placing them on disk.")
+            reasons.append(t.BLOCK_SELECT_CLIP)
         params = self.gen.params()
         if params.precision == "fp16" and not str(params.device).startswith("cuda"):
-            reasons.append("FP16 is only available on CUDA.")
+            reasons.append(t.BLOCK_FP16_CUDA)
         return reasons
 
     def _refresh_actions(self) -> None:
         reasons = self._blockers()
         self.run_btn.setEnabled(not reasons)
-        self.run_btn.setToolTip("\n".join(reasons) if reasons else "Run one or more real ToonCrafter passes.")
+        self.run_btn.setToolTip("\n".join(reasons) if reasons else t.TIP_RUN_OK)
         plan = plan_intermediates(self.gen.params().intermediates)
         if not self.worker_host.is_running():
-            self.progress.set_status("Idle. " + plan.description)
+            self.progress.set_status(t.STATUS_IDLE_PREFIX + " " + plan.description)
 
     def start_job(self) -> None:
         reasons = self._blockers()
         if reasons:
-            QMessageBox.warning(self, "Cannot interpolate", "\n".join(reasons))
+            QMessageBox.warning(self, t.TITLE_CANNOT_RUN, "\n".join(reasons))
             return
         params = self.gen.params()
         ckpt = self.gen.selected_checkpoint()
@@ -246,7 +246,7 @@ class MainWindow(QMainWindow):
 
     def cancel_job(self) -> None:
         if self.worker_host.is_running():
-            self.progress.set_status("Cancelling after this DDIM step…")
+            self.progress.set_status(t.STATUS_CANCELLING)
             self.worker_host.cancel()
 
     def _on_progress(self, event: ProgressEvent) -> None:
@@ -256,18 +256,18 @@ class MainWindow(QMainWindow):
         self.result_frames = list(frames)  # type: ignore[arg-type]
         self.preview.set_frames(self.result_frames, self.gen.params().fps)
         self.progress.set_running(False)
-        self.progress.set_status(f"Done. {len(self.result_frames)} frames.")
+        self.progress.set_status(t.STATUS_DONE.format(n=len(self.result_frames)))
         self._refresh_actions()
 
     def _on_failed(self, message: str) -> None:
         self.progress.set_running(False)
-        self.progress.set_status("Failed.")
-        QMessageBox.critical(self, "Interpolation failed", message)
+        self.progress.set_status(t.FAILED)
+        QMessageBox.critical(self, t.TITLE_RUN_FAILED, message)
         self._refresh_actions()
 
     def _on_cancelled(self) -> None:
         self.progress.set_running(False)
-        self.progress.set_status("Cancelled.")
+        self.progress.set_status(t.CANCELLED)
         self._refresh_actions()
 
     def _persist_settings(self) -> None:
@@ -286,7 +286,7 @@ class MainWindow(QMainWindow):
         save_settings(self.settings)
 
     def save_project(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Save project", "", "ToonCrafter project (*.json)")
+        path, _ = QFileDialog.getSaveFileName(self, t.TITLE_SAVE_PROJECT, "", t.FILTER_PROJECT)
         if not path:
             return
         dest = Path(path)
@@ -301,10 +301,10 @@ class MainWindow(QMainWindow):
             clip_file=self.gen.clip_path.text(),
         )
         self.project_path = dest
-        self.statusBar().showMessage(f"Saved {dest}", 4000)
+        self.statusBar().showMessage(t.STATUS_SAVED.format(path=dest), 4000)
 
     def open_project(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Open project", "", "ToonCrafter project (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, t.TITLE_OPEN_PROJECT, "", t.FILTER_PROJECT)
         if not path:
             return
         self.load_project_file(Path(path))
@@ -323,10 +323,8 @@ class MainWindow(QMainWindow):
         if project.missing_keyframes:
             QMessageBox.warning(
                 self,
-                "Missing keyframes",
-                "This project refers to keyframe files that are not on disk: "
-                + ", ".join(project.missing_keyframes)
-                + ". Paths were kept; choose replacements before interpolating.",
+                t.TITLE_MISSING_KEYFRAMES,
+                t.MISSING_KEYFRAMES_BODY.format(names=", ".join(project.missing_keyframes)),
             )
         self._refresh_actions()
 
@@ -345,7 +343,7 @@ class MainWindow(QMainWindow):
     def _export_png(self) -> None:
         if not self.result_frames:
             return
-        folder = QFileDialog.getExistingDirectory(self, "PNG sequence folder", self.settings.last_export_dir or "")
+        folder = QFileDialog.getExistingDirectory(self, t.TITLE_PNG_FOLDER, self.settings.last_export_dir or "")
         if not folder:
             return
         dest = Path(folder)
@@ -354,29 +352,29 @@ class MainWindow(QMainWindow):
         self.preview.last_export_dir = dest
         save_settings(self.settings)
         self.preview._set_export_enabled(True)
-        self.statusBar().showMessage(f"Wrote PNG sequence to {dest}", 4000)
+        self.statusBar().showMessage(t.STATUS_WROTE_PNG.format(path=dest), 4000)
 
     def _export_mp4(self) -> None:
-        dest = self._ask_export("Export MP4", "MP4 (*.mp4)")
+        dest = self._ask_export(t.TITLE_EXPORT_MP4, t.FILTER_MP4)
         if dest is None:
             return
         try:
             export_mp4(self.result_frames, dest, self.gen.params().fps, resolve_ffmpeg(self.settings.ffmpeg_path))
         except Exception as exc:
-            QMessageBox.critical(self, "MP4 export failed", str(exc))
+            QMessageBox.critical(self, t.TITLE_MP4_FAILED, str(exc))
             return
-        self.statusBar().showMessage(f"Wrote {dest}", 4000)
+        self.statusBar().showMessage(t.STATUS_WROTE.format(path=dest), 4000)
 
     def _export_gif(self) -> None:
-        dest = self._ask_export("Export GIF", "GIF (*.gif)")
+        dest = self._ask_export(t.TITLE_EXPORT_GIF, t.FILTER_GIF)
         if dest is None:
             return
         try:
             export_gif(self.result_frames, dest, self.gen.params().fps, resolve_ffmpeg(self.settings.ffmpeg_path))
         except Exception as exc:
-            QMessageBox.critical(self, "GIF export failed", str(exc))
+            QMessageBox.critical(self, t.TITLE_GIF_FAILED, str(exc))
             return
-        self.statusBar().showMessage(f"Wrote {dest}", 4000)
+        self.statusBar().showMessage(t.STATUS_WROTE.format(path=dest), 4000)
 
     def _open_folder(self) -> None:
         folder = self.preview.last_export_dir
@@ -387,11 +385,8 @@ class MainWindow(QMainWindow):
     def _about(self) -> None:
         QMessageBox.about(
             self,
-            "About",
-            f"<h3>{APP_DISPLAY_NAME}</h3>"
-            f"<p>Version {__version__}. Real ToonCrafter 512-interp, no substitute interpolator.</p>"
-            "<p>Vendored from AIGODLIKE/ComfyUI-ToonCrafter and ToonCrafter/ToonCrafter (Apache-2.0). "
-            "Weights are not included.</p>",
+            t.TITLE_ABOUT,
+            f"<h3>{APP_DISPLAY_NAME}</h3>" + t.ABOUT_BODY.format(version=__version__),
         )
 
     def closeEvent(self, event) -> None:  # noqa: N802
