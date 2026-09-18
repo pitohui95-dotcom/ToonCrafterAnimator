@@ -8,6 +8,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def verify_tooncrafter_bundle(dist: Path) -> None:
+    """Fail the pack if the real ToonCrafter package / 512 yaml never landed in the onedir."""
+    inits = [p for p in dist.rglob("ToonCrafter/__init__.py") if p.is_file()]
+    if not inits:
+        raise SystemExit(f"packaged tree is missing ToonCrafter/__init__.py: {dist}")
+    utils = [p for p in dist.rglob("ToonCrafter/utils/utils.py") if p.is_file()]
+    if not utils:
+        raise SystemExit(f"packaged tree is missing ToonCrafter/utils/utils.py: {dist}")
+    yamls = [
+        p
+        for p in dist.rglob("inference_512_v1.0.yaml")
+        if p.is_file() and "ToonCrafter" in p.as_posix()
+    ]
+    if not yamls:
+        raise SystemExit(f"packaged tree is missing ToonCrafter configs/inference_512_v1.0.yaml: {dist}")
+    lvdm = [p for p in dist.rglob("lvdm/basics.py") if p.is_file()]
+    if not lvdm:
+        raise SystemExit(f"packaged tree is missing lvdm/basics.py: {dist}")
+    print(
+        "tooncrafter_package",
+        [str(p.relative_to(dist)) for p in inits[:4]],
+        "yaml",
+        [str(p.relative_to(dist)) for p in yamls[:4]],
+        flush=True,
+    )
+
+
 def verify_torchvision_bundle(dist: Path) -> None:
     """Fail the Windows pack if torchvision's native ops extension is missing."""
     inits = list(dist.rglob("torchvision/__init__.py"))
@@ -58,6 +85,14 @@ def main() -> int:
             return proc.returncode
         if cmd[1:3] == ["-m", "PyInstaller"] and dist.is_dir():
             verify_torchvision_bundle(dist)
+            verify_tooncrafter_bundle(dist)
+    release = ROOT / "release" / "ToonCrafterAnimator"
+    if release.is_dir():
+        verify_tooncrafter_bundle(release)
+        # torchvision natives only exist after a real PyInstaller dist copy
+        tv_inits = list(release.rglob("torchvision/__init__.py"))
+        if tv_inits:
+            verify_torchvision_bundle(release)
     exe = ROOT / "release" / "ToonCrafterAnimator" / "ToonCrafterAnimator.exe"
     if not exe.is_file():
         # Linux CI / local: the binary may be extensionless.

@@ -100,7 +100,9 @@ of `requirements-torch.txt`'s CPU line, then run PyInstaller.
 
 That produces `release/ToonCrafterAnimator/` with the onedir exe, `ffmpeg/`
 (LGPL build), `assets/`, `licenses/`, `README.txt`, `THIRD_PARTY_NOTICES.txt`,
-and `checksums.sha256`.
+and `checksums.sha256`. The onedir also ships the vendored `ToonCrafter`
+package under `_internal/` (so `from ToonCrafter.utils.utils import …` works)
+and torchvision `_C_stable` (so `torchvision::nms` exists).
 
 Onedir is intentional. A onefile bundle of torch unpacks several GB to `%TEMP%`
 on every launch.

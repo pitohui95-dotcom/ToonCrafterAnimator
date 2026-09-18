@@ -29,7 +29,7 @@ from tooncrafter_animator.core.models import (
 )
 from tooncrafter_animator.hardware import precision_allowed
 from tooncrafter_animator.memory import release_torch_memory
-from tooncrafter_animator.paths import inference_config_path, vendor_root
+from tooncrafter_animator.paths import inference_config_path, vendor_sys_paths
 from tooncrafter_animator import copy as t
 
 log = logging.getLogger("tooncrafter")
@@ -41,16 +41,29 @@ _PATH_READY = False
 
 
 def ensure_vendor_on_path() -> None:
-    """Make ``import lvdm`` and ``from ToonCrafter.utils.utils`` work."""
+    """Make ``import lvdm`` and ``from ToonCrafter.utils.utils`` work.
+
+    Vendor sources live at ``vendor/tooncrafter/ToonCrafter``. Frozen onedir
+    copies that tree to ``_MEIPASS`` (always on ``sys.path``) and under
+    ``vendor/tooncrafter``. Delayed imports in ``load()`` /
+    ``batch_ddim_sampling()`` still go through this helper so unfrozen runs
+    resolve the same package.
+    """
     global _PATH_READY
-    if _PATH_READY:
+    for path in reversed(vendor_sys_paths()):
+        if path in sys.path:
+            sys.path.remove(path)
+        sys.path.insert(0, path)
+    if _PATH_READY and "ToonCrafter" in sys.modules:
         return
-    root = vendor_root()
-    inner = root / "ToonCrafter"
-    for path in (str(root), str(inner)):
-        if path not in sys.path:
-            sys.path.insert(0, path)
-    _PATH_READY = True
+    try:
+        import importlib
+
+        importlib.invalidate_caches()
+        importlib.import_module("ToonCrafter")
+        _PATH_READY = True
+    except ImportError:
+        _PATH_READY = False
 
 
 def inspect_checkpoint(path: Path) -> CheckpointProbe:

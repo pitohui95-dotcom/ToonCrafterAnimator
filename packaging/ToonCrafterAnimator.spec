@@ -26,6 +26,36 @@ ROOT = _spec_dir.parent
 SRC = ROOT / "src"
 ASSETS = SRC / "tooncrafter_animator" / "assets"
 VENDOR = SRC / "tooncrafter_animator" / "vendor"
+TOONCRAFTER_ROOT = VENDOR / "tooncrafter"
+TOONCRAFTER_PKG = TOONCRAFTER_ROOT / "ToonCrafter"
+LVDM_PKG = TOONCRAFTER_PKG / "lvdm"
+
+# Analysis-time path so collect_submodules("ToonCrafter") / ("lvdm") can see
+# the vendored tree. Frozen runtime path is handled by pyi_rth_tooncrafter.py
+# plus datas dests below (``_MEIPASS`` is always on sys.path).
+sys.path.insert(0, str(TOONCRAFTER_ROOT))
+sys.path.insert(0, str(TOONCRAFTER_PKG))
+
+
+def _hidden_from_tree(pkg_dir: Path, pkg_name: str) -> list[str]:
+    """Every ``pkg.sub.module`` under *pkg_dir*, even if collect_submodules misses it."""
+    names = [pkg_name]
+    if not pkg_dir.is_dir():
+        return names
+    for py in pkg_dir.rglob("*.py"):
+        rel = py.relative_to(pkg_dir)
+        parts = list(rel.parts)
+        if any(part == "__pycache__" or part.startswith(".") for part in parts):
+            continue
+        if parts[-1] == "__init__.py":
+            parts = parts[:-1]
+        else:
+            parts[-1] = Path(parts[-1]).stem
+        if not parts:
+            continue
+        names.append(pkg_name + "." + ".".join(parts))
+    return names
+
 
 hidden = []
 for pkg in (
@@ -51,10 +81,34 @@ for pkg in (
     except Exception:
         hidden.append(pkg)
 
+hidden += _hidden_from_tree(TOONCRAFTER_PKG, "ToonCrafter")
+hidden += _hidden_from_tree(LVDM_PKG, "lvdm")
+
 hidden += [
     "tooncrafter_animator",
     "tooncrafter_animator.ui",
     "tooncrafter_animator.inference.adapter",
+    "ToonCrafter",
+    "ToonCrafter.utils",
+    "ToonCrafter.utils.utils",
+    "lvdm",
+    "lvdm.basics",
+    "lvdm.common",
+    "lvdm.distributions",
+    "lvdm.ema",
+    "lvdm.models.autoencoder",
+    "lvdm.models.autoencoder_dualref",
+    "lvdm.models.ddpm3d",
+    "lvdm.models.utils_diffusion",
+    "lvdm.models.samplers.ddim",
+    "lvdm.models.samplers.ddim_multiplecond",
+    "lvdm.modules.attention",
+    "lvdm.modules.attention_svd",
+    "lvdm.modules.x_transformer",
+    "lvdm.modules.encoders.condition",
+    "lvdm.modules.encoders.resampler",
+    "lvdm.modules.networks.ae_modules",
+    "lvdm.modules.networks.openaimodel3d",
     "torchvision",
     "torchvision.ops",
     "torchvision.ops.boxes",
@@ -74,7 +128,11 @@ datas += collect_data_files("open_clip")
 datas += collect_data_files("transformers")
 datas += collect_data_files("omegaconf")
 datas += [(str(ASSETS), "tooncrafter_animator/assets")]
-datas += [(str(VENDOR), "tooncrafter_animator/vendor")]
+# Match vendor_root(): _MEIPASS/vendor/tooncrafter/ToonCrafter/...
+datas += [(str(VENDOR), "vendor")]
+# Top-level packages on _MEIPASS (always on frozen sys.path).
+datas += [(str(TOONCRAFTER_PKG), "ToonCrafter")]
+datas += [(str(LVDM_PKG), "lvdm")]
 
 binaries = []
 try:
@@ -125,13 +183,16 @@ block_cipher = None
 
 a = Analysis(
     [str(SRC / "tooncrafter_animator" / "__main__.py")],
-    pathex=[str(SRC)],
+    pathex=[str(SRC), str(TOONCRAFTER_ROOT), str(TOONCRAFTER_PKG)],
     binaries=binaries,
     datas=datas,
     hiddenimports=hidden,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[str(ROOT / "packaging" / "pyi_rth_torchvision_ops.py")],
+    runtime_hooks=[
+        str(ROOT / "packaging" / "pyi_rth_tooncrafter.py"),
+        str(ROOT / "packaging" / "pyi_rth_torchvision_ops.py"),
+    ],
     excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

@@ -60,3 +60,5 @@ def test_module_selftest() -> None:
     data = json.loads(proc.stdout)
     assert data.get("ok") is True
     assert data.get("window")
+    assert data.get("tooncrafter_ok") is True
+    assert data.get("inference_yaml_ok") is True

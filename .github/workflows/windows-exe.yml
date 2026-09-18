@@ -60,6 +60,23 @@ jobs:
           if (-not $native) { throw "torchvision C++ extension (_C_stable/_C) missing; torchvision::nms will fail" }
           Write-Host "torchvision native:"
           $native | Format-Table Name, Length
+          $tc = Get-ChildItem -Path $root -Recurse -Filter "__init__.py" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Directory.Name -eq "ToonCrafter" } |
+            Select-Object -First 1
+          if (-not $tc) { throw "ToonCrafter package (__init__.py) missing from onedir" }
+          Write-Host "ToonCrafter package:" $tc.FullName
+          $yaml = Get-ChildItem -Path $root -Recurse -Filter "inference_512_v1.0.yaml" -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $yaml) { throw "ToonCrafter inference_512_v1.0.yaml missing from onedir" }
+          Write-Host "ToonCrafter yaml:" $yaml.FullName
+          $utils = Get-ChildItem -Path $root -Recurse -Filter "utils.py" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'ToonCrafter[\\/]+utils[\\/]+utils\.py$' } |
+            Select-Object -First 1
+          if (-not $utils) { throw "ToonCrafter/utils/utils.py missing from onedir" }
+          $lvdm = Get-ChildItem -Path $root -Recurse -Filter "basics.py" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'lvdm[\\/]+basics\.py$' } |
+            Select-Object -First 1
+          if (-not $lvdm) { throw "lvdm/basics.py missing from onedir" }
           Get-Item $exe | Format-List FullName, Length, LastWriteTime
           Get-ChildItem $root | Format-Table Name, Length, Mode
           Write-Host "checksums.sha256 (head):"
