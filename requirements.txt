@@ -8,6 +8,10 @@ safetensors>=0.4
 PyYAML>=6.0
 tqdm>=4.65
 pytorch-lightning>=2.0
-open_clip_torch>=2.22.0
+# Exact pin from AIGODLIKE/ComfyUI-ToonCrafter @ 96024189. Newer open_clip
+# defaults to Transformer batch_first=True; the vendored FrozenOpenCLIPEmbedder
+# used to always permute NLD->LND, which makes CLIP's 77x77 attn_mask fail with
+# "should be (1, 1)". condition.py also honors batch_first if this pin moves.
+open_clip_torch==2.22.0
 transformers>=4.36
 kornia>=0.7

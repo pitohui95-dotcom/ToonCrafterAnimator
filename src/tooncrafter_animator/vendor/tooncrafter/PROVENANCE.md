@@ -37,7 +37,6 @@ ComfyUI node wrappers, training, Gradio, ControlNet/sketch (`cldm/`), MiDaS/BSRG
 * `ToonCrafter/lvdm/modules/attention.py`
 * `ToonCrafter/lvdm/modules/attention_svd.py`
 * `ToonCrafter/lvdm/modules/x_transformer.py`
-* `ToonCrafter/lvdm/modules/encoders/condition.py`
 * `ToonCrafter/lvdm/modules/encoders/resampler.py`
 * `ToonCrafter/lvdm/modules/networks/ae_modules.py`
 * `ToonCrafter/lvdm/modules/networks/openaimodel3d.py`
@@ -47,6 +46,12 @@ ComfyUI node wrappers, training, Gradio, ControlNet/sketch (`cldm/`), MiDaS/BSRG
 * `ToonCrafter/utils/utils.py` — slimmed. Removed `cv2` image helpers and
   `torch.distributed` setup; kept `count_params`, `instantiate_from_config`,
   and `get_obj_from_str` with original behaviour. Header comment in the file.
+* `ToonCrafter/lvdm/modules/encoders/condition.py` — OpenCLIP sequence layout.
+  `FrozenOpenCLIPEmbedder.encode_with_transformer` and
+  `FrozenOpenCLIPImageEmbedderV2.encode_with_vision_transformer` permute
+  NLD↔LND only when the transformer is sequence-first. Newer open_clip
+  (`batch_first=True`) keeps NLD so the CLIP 77×77 causal `attn_mask` is
+  valid. Header comment in the file.
 
 ## Files added here (not in upstream)
 
@@ -70,5 +75,9 @@ imports `lvdm`. It:
 * forces `unet_config.params.use_checkpoint = False` (same as the ComfyUI node)
 * calls `torch.load(..., weights_only=True)` when loading `.ckpt` files
 * never executes scripts from a checkpoint folder
+
+Packaging pins ``open_clip_torch==2.22.0`` (same as ComfyUI-ToonCrafter
+`96024189`). The condition.py layout patch is extra so a newer open_clip
+with `batch_first=True` still runs the real FrozenOpenCLIPEmbedder.
 
 Model **weights** are not redistributed.

@@ -20,7 +20,7 @@ dependencies = [
     "PyYAML>=6.0",
     "tqdm>=4.65",
     "pytorch-lightning>=2.0",
-    "open_clip_torch>=2.22.0",
+    "open_clip_torch==2.22.0",
     "transformers>=4.36",
     "kornia>=0.7",
 ]

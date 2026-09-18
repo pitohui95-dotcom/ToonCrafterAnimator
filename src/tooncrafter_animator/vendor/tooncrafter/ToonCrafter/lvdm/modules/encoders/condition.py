@@ -1,3 +1,18 @@
+# CHANGED from upstream ToonCrafter/lvdm/modules/encoders/condition.py
+# FrozenOpenCLIPEmbedder.encode_with_transformer and
+# FrozenOpenCLIPImageEmbedderV2.encode_with_vision_transformer used to always
+# permute NLD -> LND. That matches open_clip_torch==2.22.0 (ComfyUI-ToonCrafter
+# pin; nn.MultiheadAttention batch_first=False). open_clip >= 2.26 defaults to
+# batch_first=True (NLD). The extra permute made a batch-1 CLIP forward look
+# like seq_len=1, so PyTorch rejected the causal attn_mask:
+#   The shape of the 2D attn_mask is torch.Size([77, 77]), but should be (1, 1).
+# Layout is now taken from transformer.batch_first / MHA.batch_first.
+# Everything else in this file is unchanged.
+#
+# Upstream: https://github.com/ToonCrafter/ToonCrafter
+# Vendored via: https://github.com/AIGODLIKE/ComfyUI-ToonCrafter @ 96024189
+# See ../../PROVENANCE.md (Apache-2.0 §4(b) prominent notice).
+
 import torch
 import torch.nn as nn
 import kornia
@@ -7,6 +22,25 @@ from torch.utils.checkpoint import checkpoint
 from transformers import T5Tokenizer, T5EncoderModel, CLIPTokenizer, CLIPTextModel
 from lvdm.common import autocast
 from ToonCrafter.utils.utils import count_params
+
+
+def openclip_transformer_is_batch_first(transformer) -> bool:
+    """True when this OpenCLIP transformer stack expects NLD, not CLIP LND."""
+    if transformer is None:
+        return False
+    if hasattr(transformer, "batch_first"):
+        return bool(transformer.batch_first)
+    try:
+        return bool(getattr(transformer.resblocks[0].attn, "batch_first", False))
+    except (AttributeError, IndexError):
+        return False
+
+
+def apply_openclip_sequence_layout(x, transformer):
+    """Permute NLD <-> LND only for sequence-first OpenCLIP / CLIP MHA."""
+    if openclip_transformer_is_batch_first(transformer):
+        return x
+    return x.permute(1, 0, 2)
 
 
 class AbstractEncoder(nn.Module):
@@ -233,9 +267,10 @@ class FrozenOpenCLIPEmbedder(AbstractEncoder):
     def encode_with_transformer(self, text):
         x = self.model.token_embedding(text)  # [batch_size, n_ctx, d_model]
         x = x + self.model.positional_embedding
-        x = x.permute(1, 0, 2)  # NLD -> LND
+        transformer = self.model.transformer
+        x = apply_openclip_sequence_layout(x, transformer)
         x = self.text_transformer_forward(x, attn_mask=self.model.attn_mask)
-        x = x.permute(1, 0, 2)  # LND -> NLD
+        x = apply_openclip_sequence_layout(x, transformer)
         x = self.model.ln_final(x)
         return x
 
@@ -386,9 +421,10 @@ class FrozenOpenCLIPImageEmbedderV2(AbstractEncoder):
         x = self.model.visual.patch_dropout(x)
         x = self.model.visual.ln_pre(x)
 
-        x = x.permute(1, 0, 2)  # NLD -> LND
-        x = self.model.visual.transformer(x)
-        x = x.permute(1, 0, 2)  # LND -> NLD
+        transformer = self.model.visual.transformer
+        x = apply_openclip_sequence_layout(x, transformer)
+        x = transformer(x)
+        x = apply_openclip_sequence_layout(x, transformer)
 
         return x
 

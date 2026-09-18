@@ -19,6 +19,8 @@ def test_no_comfy_or_hub_in_vendor() -> None:
 def test_provenance_lists_modified_utils() -> None:
     text = (VENDOR / "PROVENANCE.md").read_text(encoding="utf-8")
     assert "utils.py" in text
+    assert "condition.py" in text
+    assert "batch_first" in text
     assert "Apache-2.0" in text
     assert "96024189ecb2bcc7014a439b3c8676108cc26738" in text
 
