@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import json
 import os
-import sys
-from pathlib import Path
 
 import pytest
 
@@ -38,6 +35,27 @@ def test_window_builds_and_interpolate_disabled(qapp, tmp_path, monkeypatch) -> 
     assert win.menuBar().actions()[0].text() == "文件(&F)"
     assert win.preview.view.text() == "完成插帧后，帧预览会显示在这里。"
     assert win.progress.status.text().startswith("空闲")
+    win.close()
+
+
+def test_settings_default_to_cuda_fp16_when_gpu_listed(qapp, tmp_path, monkeypatch) -> None:
+    from tooncrafter_animator.hardware import DeviceInfo
+
+    fake = [
+        DeviceInfo(id="cpu", name="CPU", kind="cpu", warning="slow"),
+        DeviceInfo(
+            id="cuda:0",
+            name="NVIDIA GeForce RTX Test",
+            kind="cuda",
+            total_vram_bytes=24 * 1024**3,
+            capability="8.9",
+        ),
+    ]
+    monkeypatch.setenv("TOONCRAFTER_APPDATA", str(tmp_path))
+    monkeypatch.setattr("tooncrafter_animator.ui.settings_panel.list_devices", lambda: fake)
+    win = MainWindow(settings=AppSettings(), show_setup=False)
+    assert win.gen.device.currentData() == "cuda:0"
+    assert win.gen.precision.currentData() == "fp16"
     win.close()
 
 

@@ -226,6 +226,7 @@ class ToonCrafterAdapter:
             model = model.half()
         stage(t.STAGE_MOVE.format(device=device))
         model = model.to(device)
+        _bind_aux_devices(model, device)
 
         temporal = int(getattr(model, "temporal_length", FRAMES_PER_PASS))
         n_params = sum(p.numel() for p in model.parameters())
@@ -390,6 +391,22 @@ def _hwc_uint8_to_nchw01(torch, arr: np.ndarray):
     tensor = torch.from_numpy(np.ascontiguousarray(arr)).float() / 255.0
     tensor = tensor.permute(2, 0, 1).unsqueeze(0)
     return tensor
+
+
+def _bind_aux_devices(model, device) -> None:
+    """Keep CLIP embedders on the same device as the UNet.
+
+    Vendored FrozenOpenCLIPEmbedder stores ``self.device`` as a string chosen
+    at init (often ``cuda``). After ``model.to(cuda:0)`` parameters move,
+    but token tensors still go through ``tokens.to(self.device)``.
+    """
+    for name in ("cond_stage_model", "embedder"):
+        sub = getattr(model, name, None)
+        if sub is not None and hasattr(sub, "device"):
+            try:
+                sub.device = device
+            except Exception:
+                pass
 
 
 def _resolve_device(torch, spec: str):

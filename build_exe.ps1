@@ -14,9 +14,9 @@ if (-not (Test-Path ".venv-build\Scripts\python.exe")) {
 python -m pip install --upgrade pip wheel
 python -m pip install -r requirements.txt -r requirements-dev.txt
 python -m pip install pyinstaller
-# CPU torch by default. For CUDA, replace with:
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-python -m pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+# CUDA 12.1 torch (GPU EXE). For CPU-only:
+#   pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 python packaging\generate_icon.py
 python packaging\fetch_ffmpeg.py

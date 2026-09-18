@@ -36,8 +36,34 @@ def torch_available() -> bool:
         return False
 
 
+def torch_cuda_build() -> bool:
+    """True when this PyTorch wheel was built with CUDA (not a CPU-only wheel).
+
+    ``torch.cuda.is_available()`` can still be False on a CUDA wheel if the
+    machine has no NVIDIA GPU or the driver is too old. The Windows GPU EXE
+    must ship a CUDA wheel so ``is_available()`` can become True on the user's PC.
+    """
+    try:
+        import torch
+
+        return bool(getattr(torch.version, "cuda", None))
+    except Exception:
+        return False
+
+
 def list_devices() -> list[DeviceInfo]:
     cpu_warning = t.HW_CPU_SLOW
+    if torch_available() and not torch_cuda_build():
+        cpu_warning = t.HW_CPU_TORCH_BUILD + " " + t.HW_CPU_SLOW
+    elif torch_cuda_build():
+        try:
+            import torch
+
+            if not torch.cuda.is_available():
+                cpu_warning = t.HW_CUDA_BUILD_NO_GPU + " " + t.HW_CPU_SLOW
+        except Exception:
+            cpu_warning = t.HW_CUDA_BUILD_NO_GPU + " " + t.HW_CPU_SLOW
+
     devices = [
         DeviceInfo(
             id="cpu",

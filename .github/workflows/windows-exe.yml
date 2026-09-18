@@ -1,8 +1,6 @@
-# Build a Windows onedir EXE with CPU PyTorch (GitHub Actions windows-latest).
-# CUDA wheels are not used here: the resulting bundle would be several GB and
-# is likely to blow artifact / release size limits. Users who need GPU inference
-# should install a CUDA PyTorch into a source checkout, or rebuild locally
-# with the cu121 index after commenting the CPU torch line in build_exe.bat.
+# Build a Windows onedir EXE with CUDA PyTorch cu121 (GitHub Actions windows-latest).
+# The runner has no GPU; it still installs CUDA wheels so the onedir can call
+# torch.cuda on the user's NVIDIA machine. CPU-only torch is not labeled GPU.
 name: Windows EXE
 
 on:
@@ -14,10 +12,13 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: PyInstaller onedir (windows-latest, CPU torch)
+  build-cuda:
+    name: PyInstaller onedir (windows-latest, CUDA cu121)
     runs-on: windows-latest
     timeout-minutes: 180
+    env:
+      TORCH_VARIANT: cuda
+      PYTHONUTF8: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,10 +29,11 @@ jobs:
           python-version: "3.10"
           architecture: x64
 
-      - name: Install CPU PyTorch
+      - name: Install CUDA PyTorch (cu121)
         run: |
           python -m pip install --upgrade pip wheel
-          python -m pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+          python -c "import torch, torchvision; assert torch.version.cuda, 'CPU torch installed; refusing GPU pack'; print('torch', torch.__version__, 'cuda', torch.version.cuda, 'vision', torchvision.__version__); print('cuda_available_on_runner', torch.cuda.is_available())"
 
       - name: Install app dependencies and PyInstaller
         run: |
@@ -40,10 +42,10 @@ jobs:
 
       - name: Generate icon, fetch LGPL ffmpeg, PyInstaller, assemble release
         env:
-          PYTHONUTF8: "1"
+          TORCH_VARIANT: cuda
         run: python packaging/ci_build.py
 
-      - name: Verify release layout
+      - name: Verify CUDA release layout
         shell: pwsh
         run: |
           $root = "release/ToonCrafterAnimator"
@@ -52,6 +54,8 @@ jobs:
           foreach ($name in @("ffmpeg","assets","licenses","README.txt","THIRD_PARTY_NOTICES.txt","checksums.sha256")) {
             if (-not (Test-Path (Join-Path $root $name))) { throw "$name missing from release tree" }
           }
+          $readme = Get-Content (Join-Path $root "README.txt") -Raw
+          if ($readme -notmatch "CUDA") { throw "README.txt must state this build includes CUDA PyTorch" }
           $tv = Get-ChildItem -Path $root -Recurse -Filter "torchvision" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $tv) { throw "torchvision package missing from onedir (nms ops)" }
           $native = Get-ChildItem -Path $tv.FullName -File | Where-Object {
@@ -64,53 +68,50 @@ jobs:
             Where-Object { $_.Directory.Name -eq "ToonCrafter" } |
             Select-Object -First 1
           if (-not $tc) { throw "ToonCrafter package (__init__.py) missing from onedir" }
-          Write-Host "ToonCrafter package:" $tc.FullName
           $yaml = Get-ChildItem -Path $root -Recurse -Filter "inference_512_v1.0.yaml" -File -ErrorAction SilentlyContinue |
             Select-Object -First 1
           if (-not $yaml) { throw "ToonCrafter inference_512_v1.0.yaml missing from onedir" }
-          Write-Host "ToonCrafter yaml:" $yaml.FullName
-          $utils = Get-ChildItem -Path $root -Recurse -Filter "utils.py" -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match 'ToonCrafter[\\/]+utils[\\/]+utils\.py$' } |
-            Select-Object -First 1
-          if (-not $utils) { throw "ToonCrafter/utils/utils.py missing from onedir" }
-          $lvdm = Get-ChildItem -Path $root -Recurse -Filter "basics.py" -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match 'lvdm[\\/]+basics\.py$' } |
-            Select-Object -First 1
-          if (-not $lvdm) { throw "lvdm/basics.py missing from onedir" }
+          $cudaHits = Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object {
+              $_.Name -match 'cublas|cudnn|cudart|nvrtc|c10_cuda|torch_cuda|cusolver|cufft'
+            }
+          if (-not $cudaHits -or $cudaHits.Count -lt 2) {
+            throw "CUDA torch binaries missing (cublas/cudnn/c10_cuda/torch_cuda); refusing CPU-only pack as GPU"
+          }
+          Write-Host "CUDA natives (sample):"
+          $cudaHits | Select-Object -First 25 | Format-Table Name, Length, FullName
           Get-Item $exe | Format-List FullName, Length, LastWriteTime
           Get-ChildItem $root | Format-Table Name, Length, Mode
           Write-Host "checksums.sha256 (head):"
           Get-Content (Join-Path $root "checksums.sha256") -TotalCount 15
 
+      - name: Zip onedir (ZIP64, split if over 1.9 GiB)
+        run: python packaging/zip_release.py --src release/ToonCrafterAnimator --dest ToonCrafterAnimator-windows-x64-cuda.zip --out-dir release_upload
+
       - name: Upload release folder artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ToonCrafterAnimator-windows-x64
+          name: ToonCrafterAnimator-windows-x64-cuda
           path: release/ToonCrafterAnimator/
           if-no-files-found: error
-          compression-level: 6
+          compression-level: 0
 
-      - name: Zip onedir for GitHub Release
-        shell: pwsh
-        run: |
-          if (Test-Path ToonCrafterAnimator-windows-x64.zip) { Remove-Item ToonCrafterAnimator-windows-x64.zip }
-          Compress-Archive -Path release/ToonCrafterAnimator/* -DestinationPath ToonCrafterAnimator-windows-x64.zip -CompressionLevel Optimal
-          Get-Item ToonCrafterAnimator-windows-x64.zip | Format-List FullName, Length
-
-      - name: Attach zip to GitHub Release
+      - name: Attach CUDA zip to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: ToonCrafterAnimator v1.0.${{ github.run_number }} (Windows x64, CPU PyTorch)
+          name: ToonCrafterAnimator v1.0.${{ github.run_number }} (Windows x64, CUDA PyTorch cu121)
           body: |
-            Packaged **onedir** Windows build from `windows-latest`.
+            Packaged **onedir** Windows build with **CUDA PyTorch (cu121)** and matching torchvision.
 
-            **This artifact ships CPU PyTorch.** CUDA wheels are not bundled — a CUDA onedir is several GB and does not fit a practical GitHub Actions / Release upload. For GPU inference, install CUDA PyTorch in a source checkout (`pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121`) or rebuild locally with `build_exe.bat` after switching the torch index.
+            This is the GPU-capable release. On an NVIDIA PC the app lists CUDA devices and defaults to FP16. GitHub Actions itself has no GPU — the wheels are still the CUDA build, not CPU torch.
 
-            Contents of the zip match `release/ToonCrafterAnimator/`: `ToonCrafterAnimator.exe`, `ffmpeg/` (LGPL), `assets/`, `licenses/`, `README.txt`, `THIRD_PARTY_NOTICES.txt`, `checksums.sha256`.
+            Contents: `ToonCrafterAnimator.exe`, `ffmpeg/` (LGPL), `assets/`, `licenses/`, `README.txt` (Simplified Chinese), `THIRD_PARTY_NOTICES.txt`, `checksums.sha256`, vendored ToonCrafter, torchvision `_C_stable`.
+
+            If you downloaded `.part01` / `.part02` files, merge them first (`copy /b …`) then unzip. See `README.txt` / `*.JOIN.txt`.
 
             Model weights are **not** included. Point the first-run setup at your own checkpoint + OpenCLIP file.
-          files: ToonCrafterAnimator-windows-x64.zip
+          files: release_upload/*
           fail_on_unmatched_files: true
           make_latest: true
         env:

@@ -272,6 +272,13 @@ CKPT_UNKNOWN_SIZE = "未知大小"
 
 # --- hardware ---
 HW_CPU_SLOW = "在 CPU 上跑 16 帧 3D UNet 会非常慢（50 步 DDIM 时，每次推理可能要几十分钟到数小时）。"
+HW_CPU_TORCH_BUILD = (
+    "当前 PyTorch 是 CPU 构建（没有 CUDA）。NVIDIA GPU 插帧需要使用捆绑 CUDA 版 PyTorch 的发布包。"
+)
+HW_CUDA_BUILD_NO_GPU = (
+    "本包已捆绑 CUDA 版 PyTorch，但 torch.cuda.is_available() 为 False。"
+    "请安装较新的 NVIDIA 驱动并确认 GPU 可用。在此之前只能用 CPU。"
+)
 HW_NO_TORCH = "请安装 PyTorch 才能运行 ToonCrafter。在此之前「插帧」会保持禁用。"
 HW_VRAM_SMALL = "报告显存为 {gb:.1f} GB。FP16、320×512 / 16 帧推理通常需要约 11–13 GB。"
 HW_FP16_CUDA_ONLY = "FP16 仅在 CUDA 上提供。PyTorch 没有可用于此计算图的 FP16 CPU 内核。"

@@ -1,11 +1,11 @@
 # Install from the official PyTorch index. CUDA wheels are Windows/Linux-specific
 # and are NOT bundled by pip from PyPI in a portable way.
 #
+# Windows GitHub Release (GPU-capable EXE):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
 # CPU (this Linux VM, or a Windows machine without an NVIDIA GPU):
 #   pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
-#
-# CUDA 12.1 (typical Windows 10/11 NVIDIA install):
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 #
 # CUDA 12.4:
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124

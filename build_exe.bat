@@ -12,8 +12,8 @@ call .venv-build\Scripts\activate.bat
 python -m pip install --upgrade pip wheel
 python -m pip install -r requirements.txt -r requirements-dev.txt
 python -m pip install pyinstaller
-REM CPU torch by default. For CUDA, comment the next line and install cu121 wheels instead.
-python -m pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+REM CUDA 12.1 torch (GPU EXE). For CPU-only: use requirements-torch.txt --index-url .../cpu
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 python packaging\generate_icon.py
 python packaging\fetch_ffmpeg.py

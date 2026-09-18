@@ -72,6 +72,7 @@ def _selftest() -> int:
             }
         )
         if torch_available():
+            from tooncrafter_animator.hardware import torch_cuda_build
             from tooncrafter_animator.inference.adapter import ensure_torchvision_ops
 
             ensure_torchvision_ops()
@@ -82,8 +83,14 @@ def _selftest() -> int:
             )
             if not report["torchvision_nms"]:
                 raise RuntimeError("torchvision::nms is not registered")
+            report["torch_cuda_build"] = torch_cuda_build()
+            report["torch_version_cuda"] = getattr(torch.version, "cuda", None)
+            report["cuda_available"] = bool(torch.cuda.is_available())
         else:
             report["torchvision_nms"] = None
+            report["torch_cuda_build"] = False
+            report["torch_version_cuda"] = None
+            report["cuda_available"] = False
         # Import UI offscreen to prove widgets construct.
         from PySide6.QtWidgets import QApplication
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -46,15 +47,25 @@ def main() -> int:
         help="PyInstaller dist/ToonCrafterAnimator folder (optional on Linux).",
     )
     parser.add_argument("--ffmpeg-dir", type=Path, default=None)
+    parser.add_argument(
+        "--variant",
+        choices=("cuda", "cpu"),
+        default=os.environ.get("TORCH_VARIANT", "cuda").strip().lower() or "cuda",
+        help="Which README to ship (cuda = GPU-capable PyTorch).",
+    )
     args = parser.parse_args()
 
     RELEASE.mkdir(parents=True, exist_ok=True)
 
-    # README / notices from templates (always).
-    for name in ("README.txt", "THIRD_PARTY_NOTICES.txt"):
-        src = TEMPLATE / name
-        if src.is_file():
-            shutil.copy2(src, RELEASE / name)
+    readme_name = "README.cpu.txt" if args.variant == "cpu" else "README.txt"
+    src_readme = TEMPLATE / readme_name
+    if not src_readme.is_file():
+        src_readme = TEMPLATE / "README.txt"
+    if src_readme.is_file():
+        shutil.copy2(src_readme, RELEASE / "README.txt")
+    notices = TEMPLATE / "THIRD_PARTY_NOTICES.txt"
+    if notices.is_file():
+        shutil.copy2(notices, RELEASE / "THIRD_PARTY_NOTICES.txt")
 
     licenses_dest = RELEASE / "licenses"
     licenses_dest.mkdir(parents=True, exist_ok=True)
@@ -118,6 +129,9 @@ def main() -> int:
                 dist = candidate
                 break
     if dist and dist.is_dir():
+        placeholder = RELEASE / "WINDOWS_EXE_NOT_BUILT.txt"
+        if placeholder.is_file():
+            placeholder.unlink()
         for item in dist.iterdir():
             dest = RELEASE / item.name
             if item.is_dir():

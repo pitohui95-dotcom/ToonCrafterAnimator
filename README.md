@@ -78,11 +78,12 @@ python -m pytest -m integration
 ## Windows `.exe`
 
 PyInstaller does **not** cross-compile. CI builds the exe on GitHub Actions
-`windows-latest` (see `.github/workflows/windows-exe.yml`). That packaged build
-installs **CPU PyTorch** on purpose: a CUDA onedir is several GB and is not a
-practical Actions artifact / GitHub Release. The app still talks to a CUDA GPU
-if you run from source with a CUDA wheel; the published `.exe` is the CPU
-bundle unless you rebuild locally with CUDA torch.
+`windows-latest` (see `.github/workflows/windows-exe.yml`) with **CUDA 12.1
+PyTorch** and matching torchvision. The Actions runner has no GPU; the wheels
+are still the CUDA build so `torch.cuda.is_available()` can become true on an
+NVIDIA PC. That onedir is several GB. If the zip exceeds GitHub's 2 GB file
+limit it is split into `.part01` / `.part02` — merge with `copy /b` before
+unzipping.
 
 ```bat
 build_exe.bat
@@ -94,15 +95,16 @@ or
 powershell -ExecutionPolicy Bypass -File .\build_exe.ps1
 ```
 
-Both scripts default to the CPU torch index. For a local CUDA onedir, install
-`torch` / `torchvision` from `https://download.pytorch.org/whl/cu121` instead
-of `requirements-torch.txt`'s CPU line, then run PyInstaller.
+Both scripts install `torch` / `torchvision` from
+`https://download.pytorch.org/whl/cu121`. For a CPU-only onedir, install from
+the cpu index instead (`requirements-torch.txt`).
 
 That produces `release/ToonCrafterAnimator/` with the onedir exe, `ffmpeg/`
 (LGPL build), `assets/`, `licenses/`, `README.txt`, `THIRD_PARTY_NOTICES.txt`,
 and `checksums.sha256`. The onedir also ships the vendored `ToonCrafter`
 package under `_internal/` (so `from ToonCrafter.utils.utils import …` works)
-and torchvision `_C_stable` (so `torchvision::nms` exists).
+and torchvision `_C_stable` (so `torchvision::nms` exists). CUDA builds also
+ship cublas/cudnn/`c10_cuda` / `torch_cuda` DLLs.
 
 Onedir is intentional. A onefile bundle of torch unpacks several GB to `%TEMP%`
 on every launch.

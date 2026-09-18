@@ -1,11 +1,27 @@
 """Run the Windows packaging steps and abort on the first failure."""
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+CUDA_NAME_HINTS = (
+    "cublas",
+    "cudnn",
+    "cudart",
+    "nvrtc",
+    "c10_cuda",
+    "torch_cuda",
+    "cusolver",
+    "cusparse",
+    "cufft",
+    "curand",
+    "nvjitlink",
+    "cupti",
+)
 
 
 def verify_tooncrafter_bundle(dist: Path) -> None:
@@ -61,9 +77,75 @@ def verify_torchvision_bundle(dist: Path) -> None:
     print("torchvision_native", [p.name for p in natives], flush=True)
 
 
+def _native_files(root: Path) -> list[Path]:
+    out = []
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in {".dll", ".pyd", ".so", ".dylib"}:
+            out.append(path)
+    return out
+
+
+def verify_cuda_bundle(dist: Path) -> None:
+    """Fail if this was supposed to be a CUDA onedir but only CPU torch landed."""
+    try:
+        import torch
+
+        cuda_ver = getattr(torch.version, "cuda", None)
+    except Exception as exc:
+        raise SystemExit(f"cannot import torch while verifying CUDA bundle: {exc}") from exc
+    if not cuda_ver:
+        raise SystemExit(
+            "TORCH_VARIANT=cuda but torch.version.cuda is empty — refusing to label a CPU wheel as GPU"
+        )
+    natives = _native_files(dist)
+    hits = [
+        p
+        for p in natives
+        if any(hint in p.name.lower() for hint in CUDA_NAME_HINTS)
+    ]
+    if len(hits) < 2:
+        sample = sorted({p.name for p in natives})[:30]
+        raise SystemExit(
+            f"CUDA native libraries missing from {dist} (need cublas/cudnn/c10_cuda/torch_cuda). "
+            f"found_hints={ [p.name for p in hits] } sample={sample}"
+        )
+    print(
+        "cuda_bundle",
+        "torch.version.cuda",
+        cuda_ver,
+        "hits",
+        sorted({p.name for p in hits})[:20],
+        flush=True,
+    )
+
+
+def packaging_variant() -> str:
+    raw = os.environ.get("TORCH_VARIANT", "").strip().lower()
+    if raw in {"cuda", "cpu"}:
+        return raw
+    try:
+        import torch
+
+        return "cuda" if getattr(torch.version, "cuda", None) else "cpu"
+    except Exception:
+        return "cpu"
+
+
 def main() -> int:
     py = sys.executable
     dist = ROOT / "dist" / "ToonCrafterAnimator"
+    variant = packaging_variant()
+    print("packaging_variant", variant, flush=True)
+    if variant == "cuda":
+        try:
+            import torch
+
+            if not getattr(torch.version, "cuda", None):
+                print("refusing CUDA pack: torch.version.cuda is empty", flush=True)
+                return 2
+        except Exception as exc:
+            print(f"refusing CUDA pack: torch import failed: {exc}", flush=True)
+            return 2
     steps = [
         [py, str(ROOT / "packaging" / "generate_icon.py")],
         [py, str(ROOT / "packaging" / "fetch_ffmpeg.py")],
@@ -75,6 +157,8 @@ def main() -> int:
             str(dist),
             "--ffmpeg-dir",
             str(ROOT / "packaging" / "ffmpeg_cache"),
+            "--variant",
+            variant,
         ],
     ]
     for cmd in steps:
@@ -86,13 +170,16 @@ def main() -> int:
         if cmd[1:3] == ["-m", "PyInstaller"] and dist.is_dir():
             verify_torchvision_bundle(dist)
             verify_tooncrafter_bundle(dist)
+            if variant == "cuda":
+                verify_cuda_bundle(dist)
     release = ROOT / "release" / "ToonCrafterAnimator"
     if release.is_dir():
         verify_tooncrafter_bundle(release)
-        # torchvision natives only exist after a real PyInstaller dist copy
         tv_inits = list(release.rglob("torchvision/__init__.py"))
         if tv_inits:
             verify_torchvision_bundle(release)
+        if variant == "cuda":
+            verify_cuda_bundle(release)
     exe = ROOT / "release" / "ToonCrafterAnimator" / "ToonCrafterAnimator.exe"
     if not exe.is_file():
         # Linux CI / local: the binary may be extensionless.

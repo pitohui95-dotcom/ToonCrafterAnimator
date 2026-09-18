@@ -109,6 +109,11 @@ hidden += [
     "lvdm.modules.encoders.resampler",
     "lvdm.modules.networks.ae_modules",
     "lvdm.modules.networks.openaimodel3d",
+    "torch",
+    "torch.cuda",
+    "torch.cuda.amp",
+    "torch.backends.cuda",
+    "torch.backends.cudnn",
     "torchvision",
     "torchvision.ops",
     "torchvision.ops.boxes",
@@ -141,6 +146,59 @@ except Exception:
     pass
 try:
     binaries += collect_dynamic_libs("torchvision")
+except Exception:
+    pass
+
+# CUDA wheels put cublas/cudnn/nvrtc/c10_cuda next to torch (and sometimes
+# under site-packages/nvidia/). Collect them so the frozen EXE can actually
+# call torch.cuda on an NVIDIA GPU — CPU-only torch must not be labeled GPU.
+try:
+    torch_datas, torch_binaries, torch_hidden = collect_all("torch")
+    datas += torch_datas
+    binaries += torch_binaries
+    hidden += torch_hidden
+except Exception:
+    pass
+
+
+def _add_native_tree(directory: Path, dest_root: str) -> None:
+    if not directory.is_dir():
+        return
+    native_ext = {".dll", ".pyd", ".so", ".dylib"}
+    for path in directory.rglob("*"):
+        if path.is_file() and path.suffix.lower() in native_ext:
+            rel = path.parent.relative_to(directory)
+            dest = dest_root if str(rel) == "." else f"{dest_root}/{rel.as_posix()}"
+            binaries.append((str(path), dest))
+
+
+try:
+    import torch as _torch
+
+    _torch_dir = Path(_torch.__file__).resolve().parent
+    _add_native_tree(_torch_dir / "lib", "torch/lib")
+    _add_native_tree(_torch_dir / "bin", "torch/bin")
+    _add_native_tree(_torch_dir / "lib" / "nvidia", "torch/lib/nvidia")
+except Exception:
+    pass
+
+try:
+    import site as _site
+
+    _sp_list = []
+    try:
+        _sp_list.extend(_site.getsitepackages())
+    except Exception:
+        pass
+    if getattr(_site, "USER_SITE", None):
+        _sp_list.append(_site.USER_SITE)
+    seen_nvidia = set()
+    for _sp in _sp_list:
+        _nvidia = Path(_sp) / "nvidia"
+        key = str(_nvidia.resolve()) if _nvidia.exists() else ""
+        if key and key not in seen_nvidia:
+            seen_nvidia.add(key)
+            _add_native_tree(_nvidia, "nvidia")
 except Exception:
     pass
 
@@ -191,6 +249,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[
         str(ROOT / "packaging" / "pyi_rth_tooncrafter.py"),
+        str(ROOT / "packaging" / "pyi_rth_torch_cuda.py"),
         str(ROOT / "packaging" / "pyi_rth_torchvision_ops.py"),
     ],
     excludes=excludes,

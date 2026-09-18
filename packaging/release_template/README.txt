@@ -6,6 +6,10 @@ ToonCrafter 动画器
 
 请整文件夹复制使用。双击 ToonCrafterAnimator.exe 即可启动。
 
+本包已捆绑 **CUDA 版 PyTorch（cu121）**。在安装了较新 NVIDIA 驱动的电脑上，
+设备列表会出现 GPU，插帧默认使用 CUDA + FP16。没有 NVIDIA GPU 时仍可选用 CPU
+（会非常慢）。本包不是 CPU-only 的 PyTorch。
+
 首次运行
 --------
 本应用不会下载权重。你需要自行准备：
@@ -23,14 +27,21 @@ ToonCrafter 动画器
 
 硬件
 ----
-GitHub Actions 发布包捆绑的是 **CPU 版 PyTorch**。要在 NVIDIA GPU 上使用 FP16，
-需要自行安装 CUDA 版 PyTorch（源码环境，或本地重新打包 exe）。
-CUDA 上的 FP32 大约需要 22 GB 显存。CPU FP32 可以运行，但会非常慢。
-CI 生成的 `.exe` 不包含 CUDA。
+此发布包捆绑 CUDA 12.1 版 PyTorch + 配套 torchvision。需要 NVIDIA GPU 与足够新的驱动。
+CUDA 上的 FP16 是上游 512 插帧的预期精度；FP32 大约需要 22 GB 显存。
+CPU FP32 可以运行，但会非常慢。
 
 一次 ToonCrafter 推理固定生成 16 帧（起始 + 14 个中间帧 + 结束）。
 「运动幅度 (fs)」是模型的 FPS 条件（5–30，越小运动越大），不是输出帧数。
 如果中间帧超过 14 个，会在已生成的锚点之间再跑真实推理。
+
+分卷压缩包
+----------
+若下载到 ToonCrafterAnimator-windows-x64-cuda.zip.part01 等分卷，请先按序号合并：
+
+  copy /b ToonCrafterAnimator-windows-x64-cuda.zip.part01+ToonCrafterAnimator-windows-x64-cuda.zip.part02 ToonCrafterAnimator-windows-x64-cuda.zip
+
+然后解压得到的 zip。不要只解压其中一个分卷。
 
 ffmpeg
 ------
