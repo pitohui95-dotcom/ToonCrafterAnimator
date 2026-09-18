@@ -77,8 +77,12 @@ python -m pytest -m integration
 
 ## Windows `.exe`
 
-PyInstaller does **not** cross-compile. On a Windows 10/11 x64 machine with
-Python 3.10:
+PyInstaller does **not** cross-compile. CI builds the exe on GitHub Actions
+`windows-latest` (see `.github/workflows/windows-exe.yml`). That packaged build
+installs **CPU PyTorch** on purpose: a CUDA onedir is several GB and is not a
+practical Actions artifact / GitHub Release. The app still talks to a CUDA GPU
+if you run from source with a CUDA wheel; the published `.exe` is the CPU
+bundle unless you rebuild locally with CUDA torch.
 
 ```bat
 build_exe.bat
@@ -90,6 +94,10 @@ or
 powershell -ExecutionPolicy Bypass -File .\build_exe.ps1
 ```
 
+Both scripts default to the CPU torch index. For a local CUDA onedir, install
+`torch` / `torchvision` from `https://download.pytorch.org/whl/cu121` instead
+of `requirements-torch.txt`'s CPU line, then run PyInstaller.
+
 That produces `release/ToonCrafterAnimator/` with the onedir exe, `ffmpeg/`
 (LGPL build), `assets/`, `licenses/`, `README.txt`, `THIRD_PARTY_NOTICES.txt`,
 and `checksums.sha256`.
@@ -97,7 +105,7 @@ and `checksums.sha256`.
 Onedir is intentional. A onefile bundle of torch unpacks several GB to `%TEMP%`
 on every launch.
 
-On this Linux VM the same `packaging/make_release.py` still assembles the folder
+On Linux the same `packaging/make_release.py` still assembles the folder
 layout (minus a native `.exe`). Run from source to exercise the UI here.
 
 ## Model facts that drive the UI

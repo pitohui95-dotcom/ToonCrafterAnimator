@@ -1,0 +1,96 @@
+# Build a Windows onedir EXE with CPU PyTorch (GitHub Actions windows-latest).
+# CUDA wheels are not used here: the resulting bundle would be several GB and
+# is likely to blow artifact / release size limits. Users who need GPU inference
+# should install a CUDA PyTorch into a source checkout, or rebuild locally
+# with the cu121 index after commenting the CPU torch line in build_exe.bat.
+name: Windows EXE
+
+on:
+  push:
+    branches: [main, cursor/tooncrafter-animator-35e1]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: PyInstaller onedir (windows-latest, CPU torch)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10 x64
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          architecture: x64
+
+      - name: Install CPU PyTorch
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install app dependencies and PyInstaller
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Generate icon, fetch LGPL ffmpeg, PyInstaller, assemble release
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python packaging/generate_icon.py
+          python packaging/fetch_ffmpeg.py
+          python -m PyInstaller --noconfirm --clean packaging/ToonCrafterAnimator.spec
+          python packaging/make_release.py --dist dist/ToonCrafterAnimator --ffmpeg-dir packaging/ffmpeg_cache
+
+      - name: Verify release layout
+        shell: pwsh
+        run: |
+          $root = "release/ToonCrafterAnimator"
+          $exe = Join-Path $root "ToonCrafterAnimator.exe"
+          if (-not (Test-Path $exe)) { throw "ToonCrafterAnimator.exe missing" }
+          foreach ($name in @("ffmpeg","assets","licenses","README.txt","THIRD_PARTY_NOTICES.txt","checksums.sha256")) {
+            if (-not (Test-Path (Join-Path $root $name))) { throw "$name missing from release tree" }
+          }
+          Get-Item $exe | Format-List FullName, Length, LastWriteTime
+          Get-ChildItem $root | Format-Table Name, Length, Mode
+          Write-Host "checksums.sha256 (head):"
+          Get-Content (Join-Path $root "checksums.sha256") -TotalCount 15
+
+      - name: Upload release folder artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ToonCrafterAnimator-windows-x64
+          path: release/ToonCrafterAnimator/
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Zip onedir for GitHub Release
+        shell: pwsh
+        run: |
+          if (Test-Path ToonCrafterAnimator-windows-x64.zip) { Remove-Item ToonCrafterAnimator-windows-x64.zip }
+          Compress-Archive -Path release/ToonCrafterAnimator/* -DestinationPath ToonCrafterAnimator-windows-x64.zip -CompressionLevel Optimal
+          Get-Item ToonCrafterAnimator-windows-x64.zip | Format-List FullName, Length
+
+      - name: Attach zip to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: ToonCrafterAnimator v1.0.${{ github.run_number }} (Windows x64, CPU PyTorch)
+          body: |
+            Packaged **onedir** Windows build from `windows-latest`.
+
+            **This artifact ships CPU PyTorch.** CUDA wheels are not bundled — a CUDA onedir is several GB and does not fit a practical GitHub Actions / Release upload. For GPU inference, install CUDA PyTorch in a source checkout (`pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121`) or rebuild locally with `build_exe.bat` after switching the torch index.
+
+            Contents of the zip match `release/ToonCrafterAnimator/`: `ToonCrafterAnimator.exe`, `ffmpeg/` (LGPL), `assets/`, `licenses/`, `README.txt`, `THIRD_PARTY_NOTICES.txt`, `checksums.sha256`.
+
+            Model weights are **not** included. Point the first-run setup at your own checkpoint + OpenCLIP file.
+          files: ToonCrafterAnimator-windows-x64.zip
+          fail_on_unmatched_files: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

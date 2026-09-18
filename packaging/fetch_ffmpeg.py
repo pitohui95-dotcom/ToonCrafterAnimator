@@ -38,7 +38,8 @@ def fetch(url: str, dest_dir: Path, expected: str = "") -> Path:
     dest_dir.mkdir(parents=True, exist_ok=True)
     zip_path = dest_dir / "ffmpeg-win64-lgpl.zip"
     print(f"Downloading {url}")
-    with urllib.request.urlopen(url, timeout=120) as resp:
+    req = urllib.request.Request(url, headers={"User-Agent": "ToonCrafterAnimator-packaging"})
+    with urllib.request.urlopen(req, timeout=300) as resp:
         data = resp.read()
     zip_path.write_bytes(data)
     digest = hashlib.sha256(data).hexdigest()

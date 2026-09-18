@@ -23,9 +23,10 @@ Nothing is uploaded. Scripts sitting next to the weights are never executed.
 
 Hardware
 --------
-FP16 on an NVIDIA GPU with ~12 GB VRAM is the intended path. FP32 on CUDA needs
-~22 GB. CPU FP32 works and is extremely slow. CUDA is not bundled — install a
-CUDA-enabled PyTorch when you run build_exe.ps1, or use the CPU wheels.
+The published GitHub Actions build bundles **CPU PyTorch**. FP16 on an NVIDIA
+GPU needs a CUDA PyTorch install (source checkout, or a local rebuild of the
+exe). FP32 on CUDA needs ~22 GB. CPU FP32 works and is extremely slow. CUDA is
+not bundled in the CI `.exe`.
 
 One ToonCrafter pass always produces 16 frames (start + 14 in-betweens + end).
 The "Motion (frame stride)" control is the model's FPS condition (5–30, smaller
